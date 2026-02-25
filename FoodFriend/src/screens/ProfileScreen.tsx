@@ -106,7 +106,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         <Text style={styles.cardTitle}>App Preferences</Text>
         <Button title="Edit Goals" onPress={() => navigation.navigate('Goals')} />
         <View style={{ marginVertical: 5 }} />
-        <Button title="Edit Safe Foods" onPress={() => navigation.navigate('SafeFoods')} />
+        <Button title="Edit Dietary Preferences" onPress={() => navigation.navigate('Preferences')} />
       </View>
 
     </ScrollView>

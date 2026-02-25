@@ -13,7 +13,7 @@ interface GoalsScreenProps {
 const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   const [selectedGoals, setSelectedGoals] = useState<{ [key: string]: boolean }>({
     broadenEatingPalette: false,
-    arfidSupport: false,
+    healthyHabits: false,
     meetNutritionalGoals: false,
     exploreNewRecipes: false,
   });
@@ -25,7 +25,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   const handleContinue = () => {
     // Here you would save the selected goals, e.g., to AsyncStorage or send to backend
     console.log("Selected Goals:", selectedGoals);
-    navigation.navigate('SafeFoods'); // Move to the next onboarding step
+    navigation.navigate('Preferences'); // Move to the next onboarding step
   };
 
   return (
@@ -42,10 +42,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
           />
         </View>
         <View style={styles.goalItem}>
-          <Text style={styles.goalText}>Support for ARFID (Avoidant/Restrictive Food Intake Disorder)</Text>
+          <Text style={styles.goalText}>Build healthy, sustainable habits</Text>
           <Switch
-            onValueChange={() => toggleGoal('arfidSupport')}
-            value={selectedGoals.arfidSupport}
+            onValueChange={() => toggleGoal('healthyHabits')}
+            value={selectedGoals.healthyHabits}
           />
         </View>
         <View style={styles.goalItem}>

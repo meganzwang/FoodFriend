@@ -6,9 +6,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import EHRLoginScreen from './src/screens/EHRLoginScreen';
 import GoalsScreen from './src/screens/GoalsScreen';
-import SafeFoodsScreen from './src/screens/SafeFoodsScreen';
 import RecommendationsScreen from './src/screens/RecommendationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import PreferencesScreen from './src/screens/PreferencesScreen';
 import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createNativeStackNavigator();
@@ -47,7 +47,7 @@ export default function App() {
         <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EHRLogin" component={EHRLoginScreen} options={{ title: 'Connect to EHR' }} />
         <Stack.Screen name="Goals" component={GoalsScreen} options={{ title: 'Your Goals' }} />
-        <Stack.Screen name="SafeFoods" component={SafeFoodsScreen} options={{ title: 'Safe Foods' }} />
+        <Stack.Screen name="Preferences" component={PreferencesScreen} options={{ title: 'My Preferences' }} />
         {/* After onboarding, the user enters the main app with tabs */}
         <Stack.Screen name="MainApp" component={MainAppTabs} options={{ headerShown: false }} />
       </Stack.Navigator>

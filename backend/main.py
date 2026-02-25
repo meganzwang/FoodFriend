@@ -142,6 +142,17 @@ async def get_recommendations():
     ]
     return mock_recipes
 
+@app.post("/api/save-preferences")
+async def save_preferences(request: Request):
+    """
+    Saves the user's food preferences. 
+    In a real app, these would be stored in a database associated with a user ID.
+    """
+    payload = await request.json()
+    # For now, we just print the preferences and return success
+    print(f"Received preferences: {payload}")
+    return {"status": "success", "message": "Preferences saved to server"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3001)
