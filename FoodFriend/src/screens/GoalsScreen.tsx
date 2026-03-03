@@ -1,115 +1,246 @@
-// FoodFriend/src/screens/GoalsScreen.tsx
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Button, ScrollView, Switch } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList, UserPreferences, NUTRIENT_GOALS, DIETS } from '../../types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-type GoalsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Goals'>;
+type GoalsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Goals'>;
 
 interface GoalsScreenProps {
   navigation: GoalsScreenNavigationProp;
 }
 
+const STORAGE_KEY = '@user_preferences';
+
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <View style={styles.sectionHeader}>
+    <Text style={styles.sectionHeaderText}>{title}</Text>
+  </View>
+);
+
+const MultiSelectGroup: React.FC<{
+  options: string[];
+  selected: string[];
+  onToggle: (option: any) => void;
+}> = ({ options, selected, onToggle }) => (
+  <View style={styles.groupContainer}>
+    {options.map((option) => (
+      <TouchableOpacity
+        key={option}
+        style={[
+          styles.chip,
+          selected.includes(option) && styles.chipSelected,
+        ]}
+        onPress={() => onToggle(option)}
+      >
+        <Text
+          style={[
+            styles.chipText,
+            selected.includes(option) && styles.chipTextSelected,
+          ]}
+        >
+          {option.replace(/_/g, ' ')}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+);
+
 const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
-  const [selectedGoals, setSelectedGoals] = useState<{ [key: string]: boolean }>({
-    broadenEatingPalette: false,
-    healthyHabits: false,
-    meetNutritionalGoals: false,
-    exploreNewRecipes: false,
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    intolerances: [],
+    diet: [],
+    increase_goals: [],
+    decrease_goals: [],
+    preferred_foods: [],
+    disliked_foods: [],
+    flavors: [],
+    texture: [],
+    cuisines: [],
   });
+  const [loading, setLoading] = useState(true);
 
-  const toggleGoal = (goal: string) => {
-    setSelectedGoals(prev => ({ ...prev, [goal]: !prev[goal] }));
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  const loadPreferences = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setPreferences({
+          intolerances: parsed.intolerances || [],
+          diet: parsed.diet || [],
+          increase_goals: parsed.increase_goals || [],
+          decrease_goals: parsed.decrease_goals || [],
+          preferred_foods: parsed.preferred_foods || [],
+          disliked_foods: parsed.disliked_foods || [],
+          flavors: parsed.flavors || [],
+          texture: parsed.texture || [],
+          cuisines: parsed.cuisines || [],
+        });
+      }
+    } catch (e) {
+      console.error('Failed to load preferences', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleContinue = () => {
-    // Here you would save the selected goals, e.g., to AsyncStorage or send to backend
-    console.log("Selected Goals:", selectedGoals);
-    navigation.navigate('Preferences'); // Move to the next onboarding step
+  const toggleSelection = (key: keyof UserPreferences, value: any) => {
+    setPreferences((prev) => {
+      const current = prev[key] as any[];
+      if (current.includes(value)) {
+        return { ...prev, [key]: current.filter((item) => item !== value) };
+      } else {
+        return { ...prev, [key]: [...current, value] };
+      }
+    });
   };
+
+  const handleContinue = async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+      navigation.navigate('Preferences');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to save goals.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>What are your goals?</Text>
-      <Text style={styles.subtitle}>Select all that apply.</Text>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.title}>What are your goals?</Text>
+        <Text style={styles.subtitle}>Help us understand your nutritional needs and diet.</Text>
 
-      <ScrollView style={styles.goalsList}>
-        <View style={styles.goalItem}>
-          <Text style={styles.goalText}>Broaden my eating palette</Text>
-          <Switch
-            onValueChange={() => toggleGoal('broadenEatingPalette')}
-            value={selectedGoals.broadenEatingPalette}
-          />
-        </View>
-        <View style={styles.goalItem}>
-          <Text style={styles.goalText}>Build healthy, sustainable habits</Text>
-          <Switch
-            onValueChange={() => toggleGoal('healthyHabits')}
-            value={selectedGoals.healthyHabits}
-          />
-        </View>
-        <View style={styles.goalItem}>
-          <Text style={styles.goalText}>Meet specific nutritional goals (e.g., iron, vitamins)</Text>
-          <Switch
-            onValueChange={() => toggleGoal('meetNutritionalGoals')}
-            value={selectedGoals.meetNutritionalGoals}
-          />
-        </View>
-        <View style={styles.goalItem}>
-          <Text style={styles.goalText}>Explore new recipes</Text>
-          <Switch
-            onValueChange={() => toggleGoal('exploreNewRecipes')}
-            value={selectedGoals.exploreNewRecipes}
-          />
-        </View>
+        <SectionHeader title="Diet" />
+        <MultiSelectGroup
+          options={DIETS}
+          selected={preferences.diet}
+          onToggle={(val) => toggleSelection('diet', val)}
+        />
+
+        <SectionHeader title="Goals to Increase" />
+        <Text style={styles.helperText}>Select nutrients you want to consume more of.</Text>
+        <MultiSelectGroup
+          options={NUTRIENT_GOALS}
+          selected={preferences.increase_goals}
+          onToggle={(val) => toggleSelection('increase_goals', val)}
+        />
+
+        <SectionHeader title="Goals to Decrease" />
+        <Text style={styles.helperText}>Select nutrients you want to limit.</Text>
+        <MultiSelectGroup
+          options={NUTRIENT_GOALS}
+          selected={preferences.decrease_goals}
+          onToggle={(val) => toggleSelection('decrease_goals', val)}
+        />
+
+        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+          <Text style={styles.continueButtonText}>Continue to Preferences</Text>
+        </TouchableOpacity>
       </ScrollView>
-
-      <Button title="Continue" onPress={handleContinue} />
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
     padding: 20,
-    backgroundColor: '#f5f5f5',
+    paddingBottom: 40,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#333',
+    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
     color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  goalsList: {
-    flexGrow: 1,
-    width: '100%',
-    marginBottom: 20,
+  sectionHeader: {
+    marginTop: 20,
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 4,
   },
-  goalItem: {
+  sectionHeaderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  helperText: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  groupContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    elevation: 2, // Android shadow
-    shadowColor: '#000', // iOS shadow
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
   },
-  goalText: {
-    fontSize: 16,
-    flexShrink: 1,
-    marginRight: 10,
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    margin: 4,
+  },
+  chipSelected: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  chipText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  chipTextSelected: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  continueButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 40,
+    alignItems: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  continueButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

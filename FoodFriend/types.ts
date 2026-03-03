@@ -48,13 +48,47 @@ export enum CookingStyle {
   NoCook = 'No-Cook Meals',
 }
 
+export const INTOLERANCES = [
+  'dairy', 'egg', 'gluten', 'grain', 'peanut', 'seafood', 'sesame', 'shellfish', 'soy', 'sulfite', 'tree_nut', 'wheat'
+];
+
+export const DIETS = [
+  'gluten_free', 'ketogenic', 'vegetarian', 'lacto_vegetarian', 'ovo_vegetarian', 'vegan', 'pescetarian', 'paleo', 'primal', 'low_fodmap', 'whole30'
+];
+
+export const NUTRIENT_GOALS = [
+  'calories', 'protein', 'fat', 'sodium', 'fiber', 'sugar', 'saturated_fat', 'iron'
+];
+
+export const FLAVORS = [
+  'sweet', 'salty', 'sour', 'bitter', 'savory', 'fatty', 'spicy'
+];
+
+export const TEXTURES = [
+  'Tender', 'Juicy', 'Smooth', 'Chewy', 'Crunchy', 'Liquid', 'Creamy', 'Crispy', 'Powdery', 'Flaky', 'Gooey', 'Soft', 'Slimy', 'Crumbly', 'Fluffy', 'Moist', 'Sticky', 'Dry', 'Oily', 'Hard'
+];
+
+export const CUISINES = [
+  'African', 'Asian', 'American', 'British', 'Cajun', 'Caribbean', 'Chinese', 'Eastern European', 'European', 'French', 'German', 'Greek', 'Indian', 'Irish', 'Italian', 'Japanese', 'Jewish', 'Korean', 'Latin American', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Nordic', 'Southern', 'Spanish', 'Thai', 'Vietnamese'
+];
+
 // Interface to capture all user-defined preferences for the food recommendation model
 export interface UserPreferences {
-  allergies: string[]; // List of specific allergens (e.g., "Peanuts", "Soy")
-  preferredFoods: string[]; // Foods the user feels comfortable eating
-  dislikedIngredients: string[]; // User's food aversions, renamed for clarity
-  dietaryRestrictions: DietaryRestriction[];
-  healthGoals: HealthGoal[];
-  cookingStyle: CookingStyle[];
-  // Add other preferences here as they are identified, e.g., preferredCuisines, mealTypes, etc.
+  intolerances: string[];
+  diet: string[];
+  increase_goals: string[];
+  decrease_goals: string[];
+  preferred_foods: string[];
+  disliked_foods: string[];
+  flavors: string[];
+  texture: string[];
+  cuisines: string[];
+  
+  // Legacy fields (optional for backward compatibility)
+  allergies?: string[];
+  preferredFoods?: string[];
+  dislikedIngredients?: string[];
+  dietaryRestrictions?: DietaryRestriction[];
+  healthGoals?: HealthGoal[];
+  cookingStyle?: CookingStyle[];
 }

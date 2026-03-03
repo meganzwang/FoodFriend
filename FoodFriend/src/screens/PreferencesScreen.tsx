@@ -1,4 +1,3 @@
-// FoodFriend/src/screens/PreferencesScreen.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
@@ -12,13 +11,16 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  DietaryRestriction,
-  HealthGoal,
-  CookingStyle,
   UserPreferences,
   RootStackParamList,
+  INTOLERANCES,
+  DIETS,
+  NUTRIENT_GOALS,
+  FLAVORS,
+  TEXTURES,
+  CUISINES,
 } from '../../types';
 
 // Assuming we moved the JSON here or import it directly
@@ -27,19 +29,7 @@ import ingredientData from '../ingredients.json';
 const API_URL = 'http://localhost:3001'; // Backend proxy URL
 const STORAGE_KEY = '@user_preferences';
 
-const BIG_9_ALLERGENS = [
-  'Milk',
-  'Eggs',
-  'Fish',
-  'Shellfish',
-  'Tree Nuts',
-  'Peanuts',
-  'Wheat',
-  'Soybeans',
-  'Sesame',
-];
-
-type PreferencesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Preferences'>;
+type PreferencesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Preferences'>;
 
 interface PreferencesScreenProps {
   navigation: PreferencesScreenNavigationProp;
@@ -72,7 +62,7 @@ const MultiSelectGroup: React.FC<{
             selected.includes(option) && styles.chipTextSelected,
           ]}
         >
-          {option}
+          {option.replace(/_/g, ' ')}
         </Text>
       </TouchableOpacity>
     ))}
@@ -81,12 +71,15 @@ const MultiSelectGroup: React.FC<{
 
 const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => {
   const [preferences, setPreferences] = useState<UserPreferences>({
-    allergies: [],
-    preferredFoods: [],
-    dislikedIngredients: [],
-    dietaryRestrictions: [],
-    healthGoals: [],
-    cookingStyle: [],
+    intolerances: [],
+    diet: [],
+    increase_goals: [],
+    decrease_goals: [],
+    preferred_foods: [],
+    disliked_foods: [],
+    flavors: [],
+    texture: [],
+    cuisines: [],
   });
   const [loading, setLoading] = useState(true);
   const [preferredSearch, setPreferredSearch] = useState('');
@@ -101,7 +94,18 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setPreferences(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setPreferences({
+          intolerances: parsed.intolerances || parsed.allergies || [],
+          diet: parsed.diet || parsed.dietaryRestrictions || [],
+          increase_goals: parsed.increase_goals || [],
+          decrease_goals: parsed.decrease_goals || [],
+          preferred_foods: parsed.preferred_foods || parsed.preferredFoods || [],
+          disliked_foods: parsed.disliked_foods || parsed.dislikedIngredients || [],
+          flavors: parsed.flavors || [],
+          texture: parsed.texture || [],
+          cuisines: parsed.cuisines || [],
+        });
       }
     } catch (e) {
       console.error('Failed to load preferences', e);
@@ -113,10 +117,8 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
   const savePreferences = async (isContinue: boolean = false) => {
     setIsSaving(true);
     try {
-      // 1. Save locally
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
       
-      // 2. Save to backend
       try {
         const response = await fetch(`${API_URL}/api/save-preferences`, {
           method: 'POST',
@@ -166,13 +168,13 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
   };
 
   const filteredPreferred = useMemo(() => 
-    getFilteredIngredients(preferredSearch, preferences.preferredFoods), 
-    [preferredSearch, preferences.preferredFoods]
+    getFilteredIngredients(preferredSearch, preferences.preferred_foods), 
+    [preferredSearch, preferences.preferred_foods]
   );
 
   const filteredDisliked = useMemo(() => 
-    getFilteredIngredients(dislikeSearch, preferences.dislikedIngredients), 
-    [dislikeSearch, preferences.dislikedIngredients]
+    getFilteredIngredients(dislikeSearch, preferences.disliked_foods), 
+    [dislikeSearch, preferences.disliked_foods]
   );
 
   if (loading) {
@@ -189,33 +191,32 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         <Text style={styles.title}>Your Preferences</Text>
         <Text style={styles.subtitle}>Help us personalize your food recommendations</Text>
 
-        <SectionHeader title="Allergies" />
-        <Text style={styles.helperText}>Select any common allergies you have.</Text>
+        <SectionHeader title="Intolerances" />
         <MultiSelectGroup
-          options={BIG_9_ALLERGENS}
-          selected={preferences.allergies}
-          onToggle={(val) => toggleSelection('allergies', val)}
+          options={INTOLERANCES}
+          selected={preferences.intolerances}
+          onToggle={(val) => toggleSelection('intolerances', val)}
         />
 
-        <SectionHeader title="Dietary Restrictions" />
+        <SectionHeader title="Preferred Flavors" />
         <MultiSelectGroup
-          options={Object.values(DietaryRestriction)}
-          selected={preferences.dietaryRestrictions}
-          onToggle={(val) => toggleSelection('dietaryRestrictions', val)}
+          options={FLAVORS}
+          selected={preferences.flavors}
+          onToggle={(val) => toggleSelection('flavors', val)}
         />
 
-        <SectionHeader title="Health Goals" />
+        <SectionHeader title="Preferred Textures" />
         <MultiSelectGroup
-          options={Object.values(HealthGoal)}
-          selected={preferences.healthGoals}
-          onToggle={(val) => toggleSelection('healthGoals', val)}
+          options={TEXTURES}
+          selected={preferences.texture}
+          onToggle={(val) => toggleSelection('texture', val)}
         />
 
-        <SectionHeader title="Cooking Style" />
+        <SectionHeader title="Preferred Cuisines" />
         <MultiSelectGroup
-          options={Object.values(CookingStyle)}
-          selected={preferences.cookingStyle}
-          onToggle={(val) => toggleSelection('cookingStyle', val)}
+          options={CUISINES}
+          selected={preferences.cuisines}
+          onToggle={(val) => toggleSelection('cuisines', val)}
         />
 
         <SectionHeader title="Preferred Foods" />
@@ -234,7 +235,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
                   key={ing}
                   style={styles.resultItem}
                   onPress={() => {
-                    toggleSelection('preferredFoods', ing);
+                    toggleSelection('preferred_foods', ing);
                     setPreferredSearch('');
                   }}
                 >
@@ -246,18 +247,18 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         </View>
 
         <View style={styles.selectedIngredients}>
-          {preferences.preferredFoods.map((ing) => (
+          {preferences.preferred_foods.map((ing) => (
             <TouchableOpacity
               key={ing}
               style={[styles.selectedChip, { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }]}
-              onPress={() => toggleSelection('preferredFoods', ing)}
+              onPress={() => toggleSelection('preferred_foods', ing)}
             >
               <Text style={[styles.selectedChipText, { color: '#2E7D32' }]}>{ing} ✕</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <SectionHeader title="Disliked Ingredients" />
+        <SectionHeader title="Disliked Foods" />
         <Text style={styles.helperText}>Foods or ingredients you want to avoid.</Text>
         <View style={styles.searchContainer}>
           <TextInput
@@ -273,7 +274,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
                   key={ing}
                   style={styles.resultItem}
                   onPress={() => {
-                    toggleSelection('dislikedIngredients', ing);
+                    toggleSelection('disliked_foods', ing);
                     setDislikeSearch('');
                   }}
                 >
@@ -285,11 +286,11 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         </View>
 
         <View style={styles.selectedIngredients}>
-          {preferences.dislikedIngredients.map((ing) => (
+          {preferences.disliked_foods.map((ing) => (
             <TouchableOpacity
               key={ing}
               style={styles.selectedChip}
-              onPress={() => toggleSelection('dislikedIngredients', ing)}
+              onPress={() => toggleSelection('disliked_foods', ing)}
             >
               <Text style={styles.selectedChipText}>{ing} ✕</Text>
             </TouchableOpacity>

@@ -4,12 +4,12 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Button, A
 import { MainTabParamList } from '../../types';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 
 type RecommendationsScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Recommendations'>,
-  StackNavigationProp<RootStackParamList>
+  NativeStackNavigationProp<RootStackParamList>
 >;
 
 interface RecommendationsScreenProps {

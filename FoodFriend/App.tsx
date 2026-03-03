@@ -10,8 +10,9 @@ import RecommendationsScreen from './src/screens/RecommendationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import PreferencesScreen from './src/screens/PreferencesScreen';
 import { Ionicons } from '@expo/vector-icons';
+import { RootStackParamList } from './types';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 // Main tab navigator for screens accessible after onboarding/login
