@@ -5,7 +5,8 @@ export type RootStackParamList = {
   EHRLogin: undefined;
   Goals: undefined;
   MainApp: undefined;
-  Preferences: undefined; // Adding a new screen for preferences
+  Preferences: undefined; 
+  IngredientRank: undefined;
 };
 
 export type MainTabParamList = {
@@ -61,7 +62,7 @@ export const NUTRIENT_GOALS = [
 ];
 
 export const FLAVORS = [
-  'sweet', 'salty', 'sour', 'bitter', 'savory', 'fatty', 'spicy'
+  'sweet', 'salty', 'sour', 'bitter', 'savory', 'fatty', 'spicy', 'neutral'
 ];
 
 export const TEXTURES = [

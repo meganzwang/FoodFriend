@@ -9,6 +9,7 @@ import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { smartConfig } from '../config/smart-config';
 import { RootStackParamList } from '../../types';
+import { CONFIG } from '../config';
 
 type EHRLoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'EHRLogin'>;
 type EHRLoginScreenRouteProp = RouteProp<RootStackParamList, 'EHRLogin'>;
@@ -20,8 +21,6 @@ interface EHRLoginScreenProps {
 
 // Ensure WebBrowser is dismissed
 WebBrowser.maybeCompleteAuthSession();
-
-const API_URL = 'http://localhost:3001'; // Backend proxy URL
 
 const EHRLoginScreen: React.FC<EHRLoginScreenProps> = ({ navigation }) => {
   const [status, setStatus] = useState('Ready to connect to FHIR server.');
@@ -70,10 +69,6 @@ const EHRLoginScreen: React.FC<EHRLoginScreenProps> = ({ navigation }) => {
     setStatus("Redirecting to Epic for authentication...");
 
     try {
-      // Note: AuthSession.startAsync is deprecated in newer versions of expo-auth-session
-      // but we'll try to keep it for now if possible, or use the recommended hooks.
-      // For the purpose of fixing the build error we'll cast to any if necessary
-      // but let's try to just fix the types first.
       const authResult = await (AuthSession as any).startAsync(authorizeParams);
 
       if (authResult.type === 'success') {
@@ -87,15 +82,21 @@ const EHRLoginScreen: React.FC<EHRLoginScreenProps> = ({ navigation }) => {
 
         addDebug(`Calling backend proxy to fetch FHIR data...`);
 
-        const proxyResponse = await fetch(`${API_URL}/api/fetch-fhir-data`, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+
+        const proxyResponse = await fetch(`${CONFIG.API_URL}/api/fetch-fhir-data`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             accessToken: dummyAccessToken, 
             patientId: dummyPatientId, 
             fhirBaseUrl: fhirBaseUrl
-          })
+          }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (!proxyResponse.ok) {
           const errorData = await proxyResponse.json();

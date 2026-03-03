@@ -30,14 +30,14 @@ const MultiSelectGroup: React.FC<{
         key={option}
         style={[
           styles.chip,
-          selected.includes(option) && styles.chipSelected,
+          (selected || []).includes(option) && styles.chipSelected,
         ]}
         onPress={() => onToggle(option)}
       >
         <Text
           style={[
             styles.chipText,
-            selected.includes(option) && styles.chipTextSelected,
+            (selected || []).includes(option) && styles.chipTextSelected,
           ]}
         >
           {option.replace(/_/g, ' ')}
@@ -70,17 +70,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setPreferences({
-          intolerances: parsed.intolerances || [],
-          diet: parsed.diet || [],
-          increase_goals: parsed.increase_goals || [],
-          decrease_goals: parsed.decrease_goals || [],
-          preferred_foods: parsed.preferred_foods || [],
-          disliked_foods: parsed.disliked_foods || [],
-          flavors: parsed.flavors || [],
-          texture: parsed.texture || [],
-          cuisines: parsed.cuisines || [],
-        });
+        if (parsed) {
+          setPreferences({
+            intolerances: parsed.intolerances || [],
+            diet: parsed.diet || [],
+            increase_goals: parsed.increase_goals || [],
+            decrease_goals: parsed.decrease_goals || [],
+            preferred_foods: parsed.preferred_foods || [],
+            disliked_foods: parsed.disliked_foods || [],
+            flavors: parsed.flavors || [],
+            texture: parsed.texture || [],
+            cuisines: parsed.cuisines || [],
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to load preferences', e);
@@ -91,7 +93,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
 
   const toggleSelection = (key: keyof UserPreferences, value: any) => {
     setPreferences((prev) => {
-      const current = prev[key] as any[];
+      const current = (prev[key] || []) as any[];
       if (current.includes(value)) {
         return { ...prev, [key]: current.filter((item) => item !== value) };
       } else {

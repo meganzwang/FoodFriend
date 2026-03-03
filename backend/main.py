@@ -1,155 +1,128 @@
 # backend/main.py
-from fastapi import FastAPI, HTTPException, Request
+import csv
+import os
+import json
+import re
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict, Any
-import requests # For making requests to the FHIR server (simulated here)
+from model import FoodFriendModel
+from datetime import datetime
 
 app = FastAPI()
+model = FoodFriendModel()
 
-# Allow CORS for communication with React Native app
+# Allow CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Adjust this in production to specific origins (e.g., your Expo app URL)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ingredients_final.csv")
+AGGREGATE_CSV = os.path.join(os.path.dirname(__file__), "..", "user_testing_aggregate.csv")
+
+# Initialize CSV with headers if it doesn't exist
+if not os.path.isfile(AGGREGATE_CSV):
+    with open(AGGREGATE_CSV, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(["Timestamp", "Intolerances", "Diet", "Inc Goals", "Dec Goals", "Flavors", "Texture", "Ranked Result", "Filtered Out"])
+
+# Exact names from ingredients_final.csv for the 10 test items
+TARGET_INGREDIENTS = {
+    "Chicken Breast": "bone in chicken breast",
+    "Peanut Butter": "crunchy peanut butter",
+    "Banana": "banana",
+    "Celery": "celery",
+    "Salmon": "salmon",
+    "Milk": "1 percent milk",
+    "Almond": "almonds",
+    "Broccoli": "broccoli",
+    "Tofu": "tofu",
+    "Shrimp": "shrimp"
+}
+
+def load_experimental_subset():
+    subset = []
+    if not os.path.exists(CSV_PATH):
+        print(f"ERROR: CSV not found at {CSV_PATH}")
+        return []
+
+    targets_lower = {v.lower() for v in TARGET_INGREDIENTS.values()}
+    found_targets = set()
+
+    with open(CSV_PATH, mode='r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            name_lower = row['name'].lower().strip()
+            if name_lower in targets_lower:
+                found_targets.add(name_lower)
+                
+                def safe_float(val):
+                    try: 
+                        if not val or val.strip() == "": return 0.0
+                        return float(val)
+                    except: return 0.0
+
+                ingredient = {
+                    "name": row['name'].title(),
+                    "flavors": [f.strip().lower() for f in row.get('flavor', '').split(';') if f],
+                    "texture": [t.strip().lower() for t in row.get('texture', '').split(';') if t],
+                    "nutrients": {
+                        "protein": "high" if safe_float(row.get('protein_amount')) > 15 else "medium" if safe_float(row.get('protein_amount')) > 5 else "low",
+                        "fat": "high" if safe_float(row.get('fat_amount')) > 10 else "medium" if safe_float(row.get('fat_amount')) > 3 else "low",
+                        "calories": "high" if safe_float(row.get('calories_amount')) > 200 else "medium" if safe_float(row.get('calories_amount')) > 50 else "low",
+                        "sugar": "high" if safe_float(row.get('sugar_amount')) > 10 else "low",
+                        "sodium": "high" if safe_float(row.get('sodium_amount')) > 400 else "low",
+                        "fiber": "high" if safe_float(row.get('fiber_amount')) > 4 else "low",
+                        "iron": "high" if safe_float(row.get('iron_amount')) > 2 else "low",
+                    },
+                    "cuisines": [] 
+                }
+                subset.append(ingredient)
+    
+    return subset
+
 @app.get("/")
 async def read_root():
     return {"message": "Food Friend Backend API"}
 
-@app.post("/api/fetch-fhir-data")
-async def fetch_fhir_data(request: Request):
-    """
-    Acts as a proxy to fetch FHIR data from an EHR server.
-    In a real scenario, this would use the accessToken to authenticate
-    and make requests to the FHIR server (fhirBaseUrl).
-    For this bare-bones setup, it will return mock data.
-    """
-    payload = await request.json()
-    access_token = payload.get("accessToken")
-    patient_id = payload.get("patientId")
-    fhir_base_url = payload.get("fhirBaseUrl")
+@app.post("/api/rank-ingredients")
+async def rank_ingredients(request: Request):
+    try:
+        user_profile = await request.json()
+        print(f"DEBUG: Ranking for profile: {user_profile}")
+        
+        ingredients = load_experimental_subset()
+        ranked, filtered = model.rank(ingredients, user_profile)
+        
+        # --- LOG TO AGGREGATE CSV ---
+        with open(AGGREGATE_CSV, mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                ", ".join(user_profile.get("intolerances", [])),
+                user_profile.get("diet", ""),
+                ", ".join(user_profile.get("increase_goals", [])),
+                ", ".join(user_profile.get("decrease_goals", [])),
+                ", ".join(user_profile.get("flavors", [])),
+                ", ".join(user_profile.get("texture", [])),
+                " > ".join([f"{i['name']} ({i['score']})" for i in ranked]),
+                ", ".join([f"{i['name']} ({i['reason']})" for i in filtered])
+            ])
+        # ----------------------------
 
-    if not all([access_token, patient_id, fhir_base_url]):
-        raise HTTPException(status_code=400, detail="Missing accessToken, patientId, or fhirBaseUrl")
-
-    # --- In a real implementation, you would: ---
-    # 1. Validate the access_token.
-    # 2. Construct FHIR API calls using the fhir_base_url and patient_id.
-    # 3. Add necessary headers (e.g., Authorization: Bearer <access_token>).
-    # 4. Make requests to the actual FHIR server for Observations, Patient demographics, etc.
-    #    Example: requests.get(f"{fhir_base_url}/Patient/{patient_id}/Observation", headers={"Authorization": f"Bearer {access_token}"})
-    # --- For now, return mock data ---
-
-    mock_patient_data = {
-        "resourceType": "Patient",
-        "id": patient_id,
-        "name": [{"family": "Doe", "given": ["John"]}],
-        "birthDate": "1990-05-15",
-    }
-
-    mock_observations_data = {
-        "resourceType": "Bundle",
-        "type": "searchset",
-        "entry": [
-            {
-                "resource": {
-                    "resourceType": "Observation",
-                    "id": "obs1",
-                    "status": "final",
-                    "code": {"coding": [{"system": "http://loinc.org", "code": "718-7", "display": "Hemoglobin"}]},
-                    "subject": {"reference": f"Patient/{patient_id}"},
-                    "valueQuantity": {"value": 14.2, "unit": "g/dL"},
-                    "effectiveDateTime": "2023-01-01T10:00:00Z"
-                }
-            },
-            {
-                "resource": {
-                    "resourceType": "Observation",
-                    "id": "obs2",
-                    "status": "final",
-                    "code": {"coding": [{"system": "http://loinc.org", "code": "2093-3", "display": "Cholesterol"}]},
-                    "subject": {"reference": f"Patient/{patient_id}"},
-                    "valueQuantity": {"value": 180, "unit": "mg/dL"},
-                    "effectiveDateTime": "2023-01-01T10:00:00Z"
-                }
-            },
-            # Add more mock observations relevant to nutrition deficiencies
-            {
-                "resource": {
-                    "resourceType": "Observation",
-                    "id": "obs3",
-                    "status": "final",
-                    "code": {"coding": [{"system": "http://loinc.org", "code": "6057-8", "display": "Vitamin D 25-hydroxy"}]},
-                    "subject": {"reference": f"Patient/{patient_id}"},
-                    "valueQuantity": {"value": 25, "unit": "ng/mL"}, # Example of a low vitamin D level
-                    "effectiveDateTime": "2023-01-01T10:00:00Z"
-                }
-            },
-        ]
-    }
-
-    # Simulate delay
-    # import asyncio
-    # await asyncio.sleep(1)
-
-    return {
-        "patient": mock_patient_data,
-        "fhirData": {
-            "allergies": [], # Placeholder for allergies
-            "conditions": [], # Placeholder for conditions
-            "medications": [], # Placeholder for medications
-            "observations": mock_observations_data["entry"] # Return actual observation entries
-        }
-    }
-
-@app.get("/api/recommendations")
-async def get_recommendations():
-    """
-    Returns mock food and recipe recommendations.
-    This is where your AI model will eventually be integrated.
-    """
-    mock_recipes: List[Dict[str, Any]] = [
-        {
-            "id": "101",
-            "title": "Creamy Avocado Pasta",
-            "image": "https://images.unsplash.com/photo-1621996384218-1c4b78f4a3e7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjVlMzF8MHwxfGFsbHwxfHx8fHx8fHwxNjQyNjk5MjQy&ixlib=rb-1.2.1&q=80&w=400",
-            "description": "A smooth, rich pasta dish, excellent for introducing healthy fats and a creamy texture. Good for sensory aversions.",
-            "nutrients": {"Vitamin D": "High", "Iron": "Medium"},
-            "sensory_attributes": {"texture": "creamy", "taste": "mild"},
-            "source": "Spoonacular (mock)"
-        },
-        {
-            "id": "102",
-            "title": "Crispy Chicken Tenders with Sweet Potato Mash",
-            "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjVlMzF8MHwxfGFsbHwxfHx8fHx8fHwxNjQyNjk5MjQy&ixlib=rb-1.2.1&q=80&w=400",
-            "description": "Familiar crunchy texture combined with a soft, sweet mash. Addresses energy density and provides iron.",
-            "nutrients": {"Iron": "High", "Vitamin C": "Medium"},
-            "sensory_attributes": {"texture": "crispy, soft", "taste": "sweet, savory"},
-            "source": "Spoonacular (mock)"
-        },
-        {
-            "id": "103",
-            "title": "Berry Spinach Smoothie",
-            "image": "https://images.unsplash.com/photo-1550989460-0adf9ea62260?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwzNjVlMzF8MHwxfGFsbHwxfHx8fHx8fHwxNjQyNjk5MjQy&ixlib=rb-1.2.1&q=80&w=400",
-            "description": "Easy to consume liquid form for nutrient boost. Good for meeting nutritional goals when solid food is challenging.",
-            "nutrients": {"Folate": "High", "Vitamin K": "High"},
-            "sensory_attributes": {"texture": "smooth", "taste": "sweet"},
-            "source": "Spoonacular (mock)"
-        },
-    ]
-    return mock_recipes
+        return {"ranked": ranked, "filtered": filtered}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"ERROR in rank_ingredients: {str(e)}")
+        return {"error": str(e)}
 
 @app.post("/api/save-preferences")
 async def save_preferences(request: Request):
-    """
-    Saves the user's food preferences. 
-    In a real app, these would be stored in a database associated with a user ID.
-    """
     payload = await request.json()
-    # For now, we just print the preferences and return success
     print(f"Received preferences: {payload}")
     return {"status": "success", "message": "Preferences saved to server"}
 

@@ -1,0 +1,5 @@
+User,Profile,Intolerances,Diet,Inc Goals,Dec Goals,Ranked Ingredients (Score),Filtered Out
+User 1,Nut-Free Vegan,"peanut, tree_nut",vegan,"protein, fiber",sodium,Broccoli (4) > Banana (2) > Celery (2) > Tofu (2) > Salmon (0),"Chicken Breast (Reason: chicken), Peanut Butter (Reason: butter), Milk (Reason: milk), Almond (Reason: almond), Shrimp (Reason: shrimp)"
+User 2,Dairy-Free Vegetarian,dairy,vegetarian,"protein, iron",fat,Salmon (4) > Almond (2) > Broccoli (2) > Banana (0) > Celery (0) > Tofu (0),"Chicken Breast (Reason: chicken), Peanut Butter (Reason: butter), Milk (Reason: milk), Shrimp (Reason: shrimp)"
+User 3,Seafood-Free Omnivore,"seafood, shellfish",none,"protein, iron",calories,Chicken Breast (0) > Peanut Butter (0) > Banana (0) > Celery (0) > Milk (0) > Almond (0) > Broccoli (0) > Tofu (0),"Salmon (Reason: salmon), Shrimp (Reason: shrimp)"
+User 4,Keto Meat-Lover,None,ketogenic,"fat, protein",sugar,Chicken Breast (4) > Peanut Butter (4) > Celery (2) > Salmon (2) > Broccoli (2) > Shrimp (2) > Banana (0) > Milk (0) > Almond (0) > Tofu (0),

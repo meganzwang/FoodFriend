@@ -22,11 +22,11 @@ import {
   TEXTURES,
   CUISINES,
 } from '../../types';
+import { CONFIG } from '../config';
 
 // Assuming we moved the JSON here or import it directly
 import ingredientData from '../ingredients.json';
 
-const API_URL = 'http://localhost:3001'; // Backend proxy URL
 const STORAGE_KEY = '@user_preferences';
 
 type PreferencesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Preferences'>;
@@ -52,14 +52,14 @@ const MultiSelectGroup: React.FC<{
         key={option}
         style={[
           styles.chip,
-          selected.includes(option) && styles.chipSelected,
+          (selected || []).includes(option) && styles.chipSelected,
         ]}
         onPress={() => onToggle(option)}
       >
         <Text
           style={[
             styles.chipText,
-            selected.includes(option) && styles.chipTextSelected,
+            (selected || []).includes(option) && styles.chipTextSelected,
           ]}
         >
           {option.replace(/_/g, ' ')}
@@ -95,17 +95,19 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setPreferences({
-          intolerances: parsed.intolerances || parsed.allergies || [],
-          diet: parsed.diet || parsed.dietaryRestrictions || [],
-          increase_goals: parsed.increase_goals || [],
-          decrease_goals: parsed.decrease_goals || [],
-          preferred_foods: parsed.preferred_foods || parsed.preferredFoods || [],
-          disliked_foods: parsed.disliked_foods || parsed.dislikedIngredients || [],
-          flavors: parsed.flavors || [],
-          texture: parsed.texture || [],
-          cuisines: parsed.cuisines || [],
-        });
+        if (parsed) {
+          setPreferences({
+            intolerances: parsed.intolerances || parsed.allergies || [],
+            diet: parsed.diet || parsed.dietaryRestrictions || [],
+            increase_goals: parsed.increase_goals || [],
+            decrease_goals: parsed.decrease_goals || [],
+            preferred_foods: parsed.preferred_foods || parsed.preferredFoods || [],
+            disliked_foods: parsed.disliked_foods || parsed.dislikedIngredients || [],
+            flavors: parsed.flavors || [],
+            texture: parsed.texture || [],
+            cuisines: parsed.cuisines || [],
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to load preferences', e);
@@ -117,24 +119,32 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
   const savePreferences = async (isContinue: boolean = false) => {
     setIsSaving(true);
     try {
+      // 1. Save locally first (Always succeeds immediately)
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
       
+      // 2. Try to save to backend with a timeout
       try {
-        const response = await fetch(`${API_URL}/api/save-preferences`, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+
+        const response = await fetch(`${CONFIG.API_URL}/api/save-preferences`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(preferences),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
           console.warn('Backend save failed, but local save succeeded');
         }
       } catch (backendError) {
-        console.warn('Could not reach backend, preferences saved locally only', backendError);
+        console.warn('Could not reach backend (timeout or network), preferences saved locally only');
       }
 
       if (isContinue) {
-        navigation.navigate('MainApp');
+        navigation.navigate('IngredientRank');
       } else {
         Alert.alert('Success', 'Preferences saved successfully!');
       }
@@ -148,7 +158,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
 
   const toggleSelection = (key: keyof UserPreferences, value: any) => {
     setPreferences((prev) => {
-      const current = prev[key] as any[];
+      const current = (prev[key] || []) as any[];
       if (current.includes(value)) {
         return { ...prev, [key]: current.filter((item) => item !== value) };
       } else {
@@ -161,8 +171,8 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
     if (query.length < 2) return [];
     return ingredientData
       .filter((ing) =>
-        ing.toLowerCase().includes(query.toLowerCase()) &&
-        !excludeList.includes(ing)
+        ing && ing.toLowerCase().includes(query.toLowerCase()) &&
+        !(excludeList || []).includes(ing)
       )
       .slice(0, 10);
   };

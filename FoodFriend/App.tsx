@@ -9,6 +9,7 @@ import GoalsScreen from './src/screens/GoalsScreen';
 import RecommendationsScreen from './src/screens/RecommendationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import PreferencesScreen from './src/screens/PreferencesScreen';
+import IngredientRankScreen from './src/screens/IngredientRankScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from './types';
 
@@ -49,6 +50,7 @@ export default function App() {
         <Stack.Screen name="EHRLogin" component={EHRLoginScreen} options={{ title: 'Connect to EHR' }} />
         <Stack.Screen name="Goals" component={GoalsScreen} options={{ title: 'Your Goals' }} />
         <Stack.Screen name="Preferences" component={PreferencesScreen} options={{ title: 'My Preferences' }} />
+        <Stack.Screen name="IngredientRank" component={IngredientRankScreen} options={{ title: 'Rankings' }} />
         {/* After onboarding, the user enters the main app with tabs */}
         <Stack.Screen name="MainApp" component={MainAppTabs} options={{ headerShown: false }} />
       </Stack.Navigator>
