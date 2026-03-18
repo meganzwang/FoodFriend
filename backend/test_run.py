@@ -1,7 +1,7 @@
 try:
-    from backend.updated_model import FoodFriendModel
+    from backend.model import FoodFriendModel
 except ModuleNotFoundError:
-    from updated_model import FoodFriendModel
+    from model import FoodFriendModel
 
 # Initialize using a CSV that exists in data/
 model = FoodFriendModel(csv_name='final_vectorized_ingredients.csv')
