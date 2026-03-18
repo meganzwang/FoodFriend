@@ -32,9 +32,9 @@ class FoodFriendModel:
 
         # Stage 1: Hard-coded Filtering Criteria (Safety & Diet)
         self.HARD_FILTERS = {
-            "dairy": ["dairy","milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard"],
-            "egg": ["egg", "albumin", "yolk", "meringue", "mayo", "mayonnaise", "lysozyme", "lecithin"],
-            "gluten": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko"],
+            "dairy": ["dairy","milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard", "cupcake", "cake"],
+            "egg": ["egg", "albumin", "yolk", "meringue", "mayo", "mayonnaise", "lysozyme", "lecithin", "cupcake", "cake"],
+            "gluten": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko", "bread", "cupcake", "cake", "cracker", "pasta"],
             "grain": ["grain","rice", "corn", "oats", "quinoa", "millet", "amaranth", "sorghum", "buckwheat"],
             "peanut": ["peanut", "groundnut"],
             "seafood": ["anchovy", "tilapia", "salmon", "tuna", "cod", "bass", "bonito", "worcestershire", "fish sauce"],
@@ -43,14 +43,20 @@ class FoodFriendModel:
             "soy": ["tofu", "tempeh", "edamame", "miso", "tamari", "shoyu", "natto", "lecithin", "glycine max"],
             "sulfite": ["sulfur dioxide", "sodium bisulfite", "potassium metabisulfite"],
             "tree_nut": ["almond", "cashew", "walnut", "pecan", "pistachio", "hazelnut", "macadamia", "brazil nut", "pine nut", "chestnut", "praline", "marzipan", "gianduja"],
-            "wheat": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko"],
+            "wheat": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko", "bread", "cupcake", "cake", "cracker", "pasta"],
 
             # Diet Filters
-            "gluten_free": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko", "brewer's yeast", "brewer’s yeast", "graham flour", "udon", "matzo", "orzo"],
-            "ketogenic": ["sugar", "honey", "maple syrup", "flour", "bread", "pasta", "rice", "corn", "potatoes", "beans", "lentils", "apples", "bananas", "grapes"],
-            "vegetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet"],
-            "vegan": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet", "milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard", "albumin", "yolk", "meringue", "mayo", "mayonnaise", "honey"],
-            "pescetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "gelatin", "lard", "suet"]
+            "gluten_free": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko", "brewer's yeast", "brewer’s yeast", "graham flour", "udon", "matzo", "orzo", "bread", "cupcake", "cake", "cracker", "pasta"],
+            "ketogenic": ["sugar", "honey", "maple syrup", "flour", "bread", "pasta", "rice", "corn", "potatoes", "beans", "lentils", "apples", "bananas", "grapes", "cupcake", "cake"],
+            "vegetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet", "lobster"],
+            "vegan": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet", "milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard", "albumin", "yolk", "meringue", "mayo", "mayonnaise", "honey", "lobster", "cupcake", "cake"],
+            "pescetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "gelatin", "lard", "suet", "lobster"],
+            "lacto_vegetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet", "lobster", "egg"],
+            "ovo_vegetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet", "lobster", "milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard"],
+            "paleo": ["grain", "rice", "corn", "oats", "wheat", "flour", "bread", "pasta", "legumes", "beans", "lentils", "soy", "tofu", "dairy", "sugar", "honey", "processed", "cupcake", "cake", "cheese"],
+            "primal": ["grain", "rice", "corn", "oats", "wheat", "flour", "bread", "pasta", "legumes", "beans", "lentils", "soy", "tofu", "sugar", "processed", "cupcake", "cake"],
+            "low_fodmap": ["garlic", "onion", "wheat", "flour", "bread", "pasta", "milk", "beans", "honey", "apple", "pear", "cheese", "cupcake", "cake"],
+            "whole30": ["sugar", "honey", "maple syrup", "alcohol", "grain", "rice", "corn", "oats", "wheat", "flour", "bread", "pasta", "legumes", "beans", "lentils", "soy", "tofu", "dairy", "cheese", "processed", "cupcake", "cake"]
         }
 
         self.FILTER_KEY_ALIASES = {
@@ -104,32 +110,102 @@ class FoodFriendModel:
 
         return user_vec
 
-    def recommend(self, user_profile, top_n=10):
-        # Safety Filter
-        forbidden = set()
+    def _get_forbidden_mask(self, df, active_filters):
+        is_forbidden = pd.Series(False, index=df.index)
+        is_gf = df['name'].str.contains(r'gluten[ -]free', case=False, na=False)
+        is_df = df['name'].str.contains(r'dairy[ -]free', case=False, na=False)
+        is_ef = df['name'].str.contains(r'egg[ -]free', case=False, na=False)
+        is_v = df['name'].str.contains(r'vegan', case=False, na=False)
+        
+        cake_pattern = re.compile(r'\b(cupcake|cake)\b', re.IGNORECASE)
+        is_cake = df['name'].str.contains(cake_pattern, na=False)
 
+        for f_key in active_filters:
+            keywords = self.HARD_FILTERS.get(f_key, [])
+            if not keywords: continue
+            
+            pattern = re.compile(r'\b(' + '|'.join(map(re.escape, keywords)) + r')', re.IGNORECASE)
+            matches = df['name'].str.contains(pattern, na=False)
+            
+            # Apply exemptions
+            if f_key in ["gluten", "wheat", "gluten_free"]:
+                matches &= ~is_gf
+            
+            if f_key == "dairy":
+                matches &= ~(is_df & is_cake)
+                matches &= ~is_v
+                
+            if f_key == "egg":
+                matches &= ~(is_ef & is_cake)
+                matches &= ~is_v
+                
+            if f_key == "vegan":
+                matches &= ~is_v
+                # For cakes, allow if labeled dairy-free AND egg-free
+                matches &= ~(is_df & is_ef & is_cake)
+                
+            is_forbidden |= matches
+        return is_forbidden
+
+    def rank(self, ingredient_names, user_profile):
+        """Ranks a specific subset of ingredients for a user."""
+        # 1. Get the subset of the dataframe
+        subset_df = self.df[self.df['name'].isin(ingredient_names)].copy()
+        
+        # 2. Identify active filters
         intolerances = user_profile.get("intolerances", [])
-        if isinstance(intolerances, str):
-            intolerances = [intolerances]
-        for intolerance in intolerances:
-            filter_key = self._normalize_filter_key(intolerance)
-            forbidden.update(self.HARD_FILTERS.get(filter_key, []))
+        if isinstance(intolerances, str): intolerances = [i.strip() for i in intolerances.split(',')]
+        
+        diet = user_profile.get("diet", [])
+        if isinstance(diet, str): diet = [d.strip() for d in diet.split(',')]
+        
+        active_filters = [self._normalize_filter_key(i) for i in intolerances] + [self._normalize_filter_key(d) for d in diet]
 
-        diets = user_profile.get("diet", [])
-        if isinstance(diets, str):
-            diets = [diets]
-        for diet in diets:
-            filter_key = self._normalize_filter_key(diet)
-            forbidden.update(self.HARD_FILTERS.get(filter_key, []))
-
-        # Filter candidates by name keywords
-        if forbidden:
-            pattern = re.compile(r'\b(' + '|'.join(map(re.escape, forbidden)) + r')\b', re.IGNORECASE)
-            candidates = self.df[~self.df['name'].str.contains(pattern, na=False)].copy()
+        # 3. Filter
+        is_forbidden = self._get_forbidden_mask(subset_df, active_filters)
+        
+        filtered_df = subset_df[is_forbidden].copy()
+        ranked_candidates = subset_df[~is_forbidden].copy()
+        
+        if not filtered_df.empty:
+            filtered_df['reason'] = "Dietary Restriction"
         else:
-            candidates = self.df.copy()
+            # Create an empty reason column if needed
+            filtered_df['reason'] = pd.Series(dtype='str')
 
-        # Vector Match
+        # 4. Score ranked candidates
+        user_vector = self._create_user_vector(user_profile)
+        feature_cols = self.tag_cols + self.nutrition_cols + self.macro_pct_cols
+        
+        if not ranked_candidates.empty:
+            scores = []
+            user_norm = np.linalg.norm(user_vector)
+            for val in ranked_candidates[feature_cols].values:
+                val_norm = np.linalg.norm(val)
+                if user_norm == 0 or val_norm == 0:
+                    scores.append(0)
+                else:
+                    scores.append(1 - cosine(user_vector, val))
+            ranked_candidates['score'] = scores
+            ranked_candidates = ranked_candidates.sort_values(by='score', ascending=False)
+        
+        return ranked_candidates[['name', 'score']].to_dict(orient='records'), filtered_df[['name', 'reason']].to_dict(orient='records')
+
+    def recommend(self, user_profile, top_n=10):
+        # 1. Get active filters
+        intolerances = user_profile.get("intolerances", [])
+        if isinstance(intolerances, str): intolerances = [intolerances]
+        
+        diets = user_profile.get("diet", [])
+        if isinstance(diets, str): diets = [diets]
+        
+        active_filters = [self._normalize_filter_key(i) for i in intolerances] + [self._normalize_filter_key(d) for d in diets]
+
+        # 2. Filter
+        is_forbidden = self._get_forbidden_mask(self.df, active_filters)
+        candidates = self.df[~is_forbidden].copy()
+
+        # 3. Vector Match
         user_vector = self._create_user_vector(user_profile)
         feature_cols = self.tag_cols + self.nutrition_cols + self.macro_pct_cols
         
