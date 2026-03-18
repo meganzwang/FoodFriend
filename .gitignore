@@ -1,0 +1,25 @@
+# Node / React Native
+node_modules/
+.expo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+
+
+# Python / Backend
+backend/venv/
+backend/__pycache__/
+*.pyc
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Secrets and Config
+# This file contains your actual keys and should NOT be in git
+FoodFriend/src/config/smart-config.ts
