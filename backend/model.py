@@ -5,7 +5,7 @@ import os
 from scipy.spatial.distance import cosine
 
 class FoodFriendModel:
-    def __init__(self, csv_name='preprocessed_ingredients_v2.csv'):
+    def __init__(self, csv_name='final_vectorized_ingredients.csv'):
         # This looks for the CSV in FoodFriend/data/
         # __file__ is FoodFriend/backend/model.py
         # dirname(__file__) is FoodFriend/backend/
@@ -30,15 +30,44 @@ class FoodFriendModel:
         metadata = ['id', 'name', 'flavor', 'texture']
         self.tag_cols = [c for c in self.df.columns if c not in metadata + self.nutrition_cols + self.macro_pct_cols]
 
-        # Standard Diet Filters
+        # Stage 1: Hard-coded Filtering Criteria (Safety & Diet)
         self.HARD_FILTERS = {
-            "dairy": ["milk", "butter", "cream", "cheese", "yogurt", "ghee", "lactose"],
-            "egg": ["albumin", "yolk", "meringue", "mayo", "mayonnaise"],
-            "gluten": ["flour", "breadcrumbs", "rye", "barley", "malt", "wheat"],
-            "vegetarian": ["beef", "pork", "chicken", "turkey", "lamb", "fish", "shrimp", "gelatin", "lard"],
-            "vegan": ["beef", "pork", "chicken", "turkey", "fish", "milk", "butter", "cheese", "egg", "honey"],
-            "ketogenic": ["sugar", "honey", "flour", "bread", "pasta", "rice", "corn", "potatoes"]
+            "dairy": ["dairy","milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard"],
+            "egg": ["egg", "albumin", "yolk", "meringue", "mayo", "mayonnaise", "lysozyme", "lecithin"],
+            "gluten": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko"],
+            "grain": ["grain","rice", "corn", "oats", "quinoa", "millet", "amaranth", "sorghum", "buckwheat"],
+            "peanut": ["peanut", "groundnut"],
+            "seafood": ["anchovy", "tilapia", "salmon", "tuna", "cod", "bass", "bonito", "worcestershire", "fish sauce"],
+            "sesame": ["tahini", "gomasio", "til", "sesame oil", "benne seed"],
+            "shellfish": ["shrimp", "prawn", "crab", "lobster", "crawfish", "mussels", "clams", "oysters", "scallops", "krill", "scampi"],
+            "soy": ["tofu", "tempeh", "edamame", "miso", "tamari", "shoyu", "natto", "lecithin", "glycine max"],
+            "sulfite": ["sulfur dioxide", "sodium bisulfite", "potassium metabisulfite"],
+            "tree_nut": ["almond", "cashew", "walnut", "pecan", "pistachio", "hazelnut", "macadamia", "brazil nut", "pine nut", "chestnut", "praline", "marzipan", "gianduja"],
+            "wheat": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko"],
+
+            # Diet Filters
+            "gluten_free": ["flour", "breadcrumbs", "semolina", "spelt", "farro", "kamut", "rye", "barley", "malt", "triticale", "couscous", "bulgur", "seitan", "panko", "brewer's yeast", "brewer’s yeast", "graham flour", "udon", "matzo", "orzo"],
+            "ketogenic": ["sugar", "honey", "maple syrup", "flour", "bread", "pasta", "rice", "corn", "potatoes", "beans", "lentils", "apples", "bananas", "grapes"],
+            "vegetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet"],
+            "vegan": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "fish", "shrimp", "shellfish", "gelatin", "lard", "suet", "milk", "butter", "cream", "cheese", "yogurt", "whey", "casein", "ghee", "lactose", "half-and-half", "kefir", "mascarpone", "ricotta", "custard", "albumin", "yolk", "meringue", "mayo", "mayonnaise", "honey"],
+            "pescetarian": ["beef", "pork", "chicken", "turkey", "lamb", "venison", "gelatin", "lard", "suet"]
         }
+
+        self.FILTER_KEY_ALIASES = {
+            "peanuts": "peanut",
+            "tree_nuts": "tree_nut",
+            "treenut": "tree_nut",
+            "tree nut": "tree_nut",
+            "tree nuts": "tree_nut",
+            "gluten-free": "gluten_free",
+            "gluten free": "gluten_free",
+            "shell fish": "shellfish"
+        }
+
+    def _normalize_filter_key(self, value):
+        normalized = str(value).strip().lower().replace('-', '_')
+        normalized = re.sub(r'\s+', '_', normalized)
+        return self.FILTER_KEY_ALIASES.get(normalized, normalized)
 
     def _create_user_vector(self, preferences):
         """Builds a vector where likes = 1, dislikes = -1, and nutrient goals = 1/0."""
@@ -78,10 +107,20 @@ class FoodFriendModel:
     def recommend(self, user_profile, top_n=10):
         # Safety Filter
         forbidden = set()
-        for i in user_profile.get("intolerances", []):
-            forbidden.update(self.HARD_FILTERS.get(i.lower(), []))
-        for d in user_profile.get("diet", []):
-            forbidden.update(self.HARD_FILTERS.get(d.lower(), []))
+
+        intolerances = user_profile.get("intolerances", [])
+        if isinstance(intolerances, str):
+            intolerances = [intolerances]
+        for intolerance in intolerances:
+            filter_key = self._normalize_filter_key(intolerance)
+            forbidden.update(self.HARD_FILTERS.get(filter_key, []))
+
+        diets = user_profile.get("diet", [])
+        if isinstance(diets, str):
+            diets = [diets]
+        for diet in diets:
+            filter_key = self._normalize_filter_key(diet)
+            forbidden.update(self.HARD_FILTERS.get(filter_key, []))
 
         # Filter candidates by name keywords
         if forbidden:
