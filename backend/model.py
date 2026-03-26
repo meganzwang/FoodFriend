@@ -170,6 +170,40 @@ class FoodFriendModel:
         if disliked_food_vector is not None:
             user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_food_vector
 
+        # 4. Blend recipe feedback (ingredients, flavors, textures) into user vector
+        liked_recipe_ingredients = preferences.get("liked_recipe_ingredients", []) or []
+        disliked_recipe_ingredients = preferences.get("disliked_recipe_ingredients", []) or []
+
+        liked_recipe_ingredient_vector = self._get_average_food_vector(liked_recipe_ingredients)
+        if liked_recipe_ingredient_vector is not None:
+            user_vec += self.PREFERRED_FOOD_WEIGHT * liked_recipe_ingredient_vector
+
+        disliked_recipe_ingredient_vector = self._get_average_food_vector(disliked_recipe_ingredients)
+        if disliked_recipe_ingredient_vector is not None:
+            user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_recipe_ingredient_vector
+
+        # Handle liked/disliked recipe flavors and textures
+        liked_recipe_flavors = preferences.get("liked_recipe_flavors", []) or []
+        disliked_recipe_flavors = preferences.get("disliked_recipe_flavors", []) or []
+        liked_recipe_textures = preferences.get("liked_recipe_textures", []) or []
+        disliked_recipe_textures = preferences.get("disliked_recipe_textures", []) or []
+
+        for flavor in liked_recipe_flavors:
+            if flavor in self.tag_cols:
+                user_vec[self.tag_cols.index(flavor)] += 0.5
+
+        for flavor in disliked_recipe_flavors:
+            if flavor in self.tag_cols:
+                user_vec[self.tag_cols.index(flavor)] -= 0.5
+
+        for texture in liked_recipe_textures:
+            if texture in self.tag_cols:
+                user_vec[self.tag_cols.index(texture)] += 0.5
+
+        for texture in disliked_recipe_textures:
+            if texture in self.tag_cols:
+                user_vec[self.tag_cols.index(texture)] -= 0.5
+
         return user_vec
 
     def _get_forbidden_mask(self, df, active_filters):

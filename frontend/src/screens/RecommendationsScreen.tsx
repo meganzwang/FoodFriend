@@ -13,12 +13,13 @@ import {
   TouchableOpacity,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MainTabParamList } from "../../types";
+import { MainTabParamList, Recipe, UserPreferences } from "../../types";
 import { CompositeNavigationProp } from "@react-navigation/native";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types";
 import { CONFIG } from "../config";
+import RecipeFeedbackModal from "../components/RecipeFeedbackModal";
 
 const STORAGE_KEY = "@user_preferences";
 
@@ -31,76 +32,176 @@ interface RecommendationsScreenProps {
   navigation: RecommendationsScreenNavigationProp;
 }
 
-interface Recipe {
-  id: number;
-  title: string;
-  image: string;
-  sourceUrl: string;
-  readyInMinutes?: number;
-  calories?: number | null;
-  diets?: string[];
-  summary?: string;
-}
-
 const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
   navigation,
 }) => {
   const [recommendations, setRecommendations] = useState<Recipe[]>([]);
+  const [recommendedIngredients, setRecommendedIngredients] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<"liked" | "disliked">(
+    "liked",
+  );
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+
+  const fetchRecommendations = async () => {
+    setIsLoading(true);
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      const prefs = saved ? JSON.parse(saved) : {};
+      setPreferences(prefs);
+
+      const response = await fetch(`${CONFIG.API_URL}/api/recommend-recipes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prefs),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(
+          data.error || `Request failed with status ${response.status}`,
+        );
+      }
+
+      setRecommendedIngredients(data.top_ingredients || []);
+      setRecommendations(data.recipes || []);
+    } catch (error) {
+      console.error("Error fetching recommendations:", error);
+      Alert.alert("Error", "Could not fetch recommendations.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchRecommendations = async () => {
-      setIsLoading(true);
-      try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        const preferences = saved ? JSON.parse(saved) : {};
-
-        const response = await fetch(
-          `${CONFIG.API_URL}/api/recommend-recipes`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(preferences),
-          },
-        );
-
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          throw new Error(
-            data.error || `Request failed with status ${response.status}`,
-          );
-        }
-
-        setRecommendations(data.recipes || []);
-      } catch (error) {
-        console.error("Error fetching recommendations:", error);
-        Alert.alert("Error", "Could not fetch recommendations.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchRecommendations();
   }, []);
 
-  const handleTryRecipe = (recipe: Recipe) => {
-    Alert.alert(
-      "Try Recipe",
-      `You've decided to try "${recipe.title}". We'll track your progress!`,
-      [{ text: "OK" }],
-    );
-    // In a real app, you'd send this feedback to your backend
+  const handleOpenFeedbackModal = (
+    recipe: Recipe,
+    type: "liked" | "disliked",
+  ) => {
+    setSelectedRecipe(recipe);
+    setFeedbackType(type);
+    setFeedbackModalVisible(true);
   };
 
-  const handleFeedback = (recipe: Recipe, liked: boolean) => {
-    const feedbackType = liked ? "Liked" : "Disliked";
-    Alert.alert(
-      feedbackType,
-      `You ${feedbackType.toLowerCase()} "${recipe.title}". Thanks for your feedback!`,
-      [{ text: "OK" }],
-    );
-    // In a real app, you'd send this feedback to your backend to refine the model
+  const mergeUnique = (existing: string[] = [], incoming: string[] = []) =>
+    Array.from(new Set([...(existing || []), ...(incoming || [])]));
+
+  const handleFeedbackSubmit = async (feedback: {
+    ingredients: string[];
+    flavors: string[];
+    textures: string[];
+  }) => {
+    if (!preferences || !selectedRecipe) return;
+
+    const latestSavedRaw = await AsyncStorage.getItem(STORAGE_KEY);
+    const latestSaved = latestSavedRaw
+      ? (JSON.parse(latestSavedRaw) as Partial<UserPreferences>)
+      : {};
+
+    const basePreferences: UserPreferences = {
+      ...preferences,
+      ...latestSaved,
+      liked_recipe_ingredients: latestSaved.liked_recipe_ingredients || [],
+      disliked_recipe_ingredients:
+        latestSaved.disliked_recipe_ingredients || [],
+      liked_recipe_flavors: latestSaved.liked_recipe_flavors || [],
+      disliked_recipe_flavors: latestSaved.disliked_recipe_flavors || [],
+      liked_recipe_textures: latestSaved.liked_recipe_textures || [],
+      disliked_recipe_textures: latestSaved.disliked_recipe_textures || [],
+      liked_flavors: latestSaved.liked_flavors || [],
+      disliked_flavors: latestSaved.disliked_flavors || [],
+      liked_textures: latestSaved.liked_textures || [],
+      disliked_textures: latestSaved.disliked_textures || [],
+      preferred_foods: latestSaved.preferred_foods || [],
+      disliked_foods: latestSaved.disliked_foods || [],
+      intolerances: latestSaved.intolerances || [],
+      diet: latestSaved.diet || [],
+      increase_goals: latestSaved.increase_goals || [],
+      decrease_goals: latestSaved.decrease_goals || [],
+      cuisines: latestSaved.cuisines || [],
+    };
+
+    const updatedPrefs: UserPreferences = {
+      ...basePreferences,
+      liked_recipe_ingredients:
+        feedbackType === "liked"
+          ? mergeUnique(
+              basePreferences.liked_recipe_ingredients,
+              feedback.ingredients,
+            )
+          : basePreferences.liked_recipe_ingredients || [],
+      disliked_recipe_ingredients:
+        feedbackType === "disliked"
+          ? mergeUnique(
+              basePreferences.disliked_recipe_ingredients,
+              feedback.ingredients,
+            )
+          : basePreferences.disliked_recipe_ingredients || [],
+      liked_recipe_flavors:
+        feedbackType === "liked"
+          ? mergeUnique(basePreferences.liked_recipe_flavors, feedback.flavors)
+          : basePreferences.liked_recipe_flavors || [],
+      disliked_recipe_flavors:
+        feedbackType === "disliked"
+          ? mergeUnique(
+              basePreferences.disliked_recipe_flavors,
+              feedback.flavors,
+            )
+          : basePreferences.disliked_recipe_flavors || [],
+      liked_recipe_textures:
+        feedbackType === "liked"
+          ? mergeUnique(
+              basePreferences.liked_recipe_textures,
+              feedback.textures,
+            )
+          : basePreferences.liked_recipe_textures || [],
+      disliked_recipe_textures:
+        feedbackType === "disliked"
+          ? mergeUnique(
+              basePreferences.disliked_recipe_textures,
+              feedback.textures,
+            )
+          : basePreferences.disliked_recipe_textures || [],
+    };
+
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPrefs));
+
+      // Try to save to backend
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          CONFIG.TIMEOUT_MS,
+        );
+
+        await fetch(`${CONFIG.API_URL}/api/save-preferences`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedPrefs),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+      } catch (error) {
+        console.warn("Could not reach backend, feedback saved locally");
+      }
+
+      setPreferences(updatedPrefs);
+      setFeedbackModalVisible(false);
+      Alert.alert(
+        "Thanks!",
+        "Your feedback has been saved and will help personalize your recommendations.",
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to save feedback.");
+    }
   };
 
   const handleOpenRecipe = async (sourceUrl: string) => {
@@ -132,6 +233,24 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
         />
       ) : (
         <ScrollView contentContainerStyle={styles.recommendationsList}>
+          <TouchableOpacity
+            style={styles.generateMoreButton}
+            onPress={fetchRecommendations}
+          >
+            <Text style={styles.generateMoreButtonText}>
+              Generate More Ingredients
+            </Text>
+          </TouchableOpacity>
+
+          {recommendedIngredients.length > 0 && (
+            <View style={styles.ingredientsCard}>
+              <Text style={styles.ingredientsTitle}>Recommended Ingredients</Text>
+              <Text style={styles.ingredientsList}>
+                {recommendedIngredients.join(" • ")}
+              </Text>
+            </View>
+          )}
+
           {recommendations.length === 0 ? (
             <Text style={styles.emptyText}>
               No recipes found for your current preferences. Try adjusting your
@@ -165,18 +284,15 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
                   </TouchableOpacity>
                 )}
                 <View style={styles.buttonRow}>
-                  <Button
-                    title="Try It"
-                    onPress={() => handleTryRecipe(recipe)}
-                  />
+                  <Button title="Didn't Try" onPress={() => {}} color="#999" />
                   <Button
                     title="👍 Liked"
-                    onPress={() => handleFeedback(recipe, true)}
+                    onPress={() => handleOpenFeedbackModal(recipe, "liked")}
                     color="green"
                   />
                   <Button
                     title="👎 Disliked"
-                    onPress={() => handleFeedback(recipe, false)}
+                    onPress={() => handleOpenFeedbackModal(recipe, "disliked")}
                     color="red"
                   />
                 </View>
@@ -185,6 +301,14 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
           )}
         </ScrollView>
       )}
+
+      <RecipeFeedbackModal
+        visible={feedbackModalVisible}
+        recipe={selectedRecipe}
+        feedbackType={feedbackType}
+        onClose={() => setFeedbackModalVisible(false)}
+        onSubmit={handleFeedbackSubmit}
+      />
     </View>
   );
 };
@@ -262,6 +386,41 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+  generateMoreButton: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  generateMoreButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  ingredientsCard: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  ingredientsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 8,
+  },
+  ingredientsList: {
+    fontSize: 14,
+    color: "#555",
+    lineHeight: 20,
   },
 });
 
