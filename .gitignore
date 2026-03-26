@@ -27,3 +27,7 @@ FoodFriend/src/config/smart-config.ts
 venv/
 .venv/
 .env
+
+# Local output / logs
+user_profiles.csv
+user_testing_aggregate.csv
