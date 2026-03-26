@@ -36,7 +36,9 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
   navigation,
 }) => {
   const [recommendations, setRecommendations] = useState<Recipe[]>([]);
-  const [recommendedIngredients, setRecommendedIngredients] = useState<string[]>([]);
+  const [recommendedIngredients, setRecommendedIngredients] = useState<
+    string[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
@@ -244,7 +246,9 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
 
           {recommendedIngredients.length > 0 && (
             <View style={styles.ingredientsCard}>
-              <Text style={styles.ingredientsTitle}>Recommended Ingredients</Text>
+              <Text style={styles.ingredientsTitle}>
+                Recommended Ingredients
+              </Text>
               <Text style={styles.ingredientsList}>
                 {recommendedIngredients.join(" • ")}
               </Text>
