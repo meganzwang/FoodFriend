@@ -1,17 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, UserPreferences, NUTRIENT_GOALS, DIETS } from '../../types';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import {
+  RootStackParamList,
+  UserPreferences,
+  NUTRIENT_GOALS,
+  DIETS,
+} from "../../types";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type GoalsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Goals'>;
+type GoalsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "Goals"
+>;
 
 interface GoalsScreenProps {
   navigation: GoalsScreenNavigationProp;
 }
 
-const STORAGE_KEY = '@user_preferences';
+const STORAGE_KEY = "@user_preferences";
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.sectionHeader}>
@@ -40,7 +56,7 @@ const MultiSelectGroup: React.FC<{
             (selected || []).includes(option) && styles.chipTextSelected,
           ]}
         >
-          {option.replace(/_/g, ' ')}
+          {option.replace(/_/g, " ")}
         </Text>
       </TouchableOpacity>
     ))}
@@ -55,8 +71,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
     decrease_goals: [],
     preferred_foods: [],
     disliked_foods: [],
-    flavors: [],
-    texture: [],
+    liked_flavors: [],
+    disliked_flavors: [],
+    liked_textures: [],
+    disliked_textures: [],
     cuisines: [],
   });
   const [loading, setLoading] = useState(true);
@@ -78,14 +96,16 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
             decrease_goals: parsed.decrease_goals || [],
             preferred_foods: parsed.preferred_foods || [],
             disliked_foods: parsed.disliked_foods || [],
-            flavors: parsed.flavors || [],
-            texture: parsed.texture || [],
+            liked_flavors: parsed.liked_flavors || parsed.flavors || [],
+            disliked_flavors: parsed.disliked_flavors || [],
+            liked_textures: parsed.liked_textures || parsed.texture || [],
+            disliked_textures: parsed.disliked_textures || [],
             cuisines: parsed.cuisines || [],
           });
         }
       }
     } catch (e) {
-      console.error('Failed to load preferences', e);
+      console.error("Failed to load preferences", e);
     } finally {
       setLoading(false);
     }
@@ -105,9 +125,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   const handleContinue = async () => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-      navigation.navigate('Preferences');
+      navigation.navigate("Preferences");
     } catch (e) {
-      Alert.alert('Error', 'Failed to save goals.');
+      Alert.alert("Error", "Failed to save goals.");
     }
   };
 
@@ -120,35 +140,44 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>What are your goals?</Text>
-        <Text style={styles.subtitle}>Help us understand your nutritional needs and diet.</Text>
+        <Text style={styles.subtitle}>
+          Help us understand your nutritional needs and diet.
+        </Text>
 
         <SectionHeader title="Diet" />
         <MultiSelectGroup
           options={DIETS}
           selected={preferences.diet}
-          onToggle={(val) => toggleSelection('diet', val)}
+          onToggle={(val) => toggleSelection("diet", val)}
         />
 
         <SectionHeader title="Goals to Increase" />
-        <Text style={styles.helperText}>Select nutrients you want to consume more of.</Text>
+        <Text style={styles.helperText}>
+          Select nutrients you want to consume more of.
+        </Text>
         <MultiSelectGroup
           options={NUTRIENT_GOALS}
           selected={preferences.increase_goals}
-          onToggle={(val) => toggleSelection('increase_goals', val)}
+          onToggle={(val) => toggleSelection("increase_goals", val)}
         />
 
         <SectionHeader title="Goals to Decrease" />
-        <Text style={styles.helperText}>Select nutrients you want to limit.</Text>
+        <Text style={styles.helperText}>
+          Select nutrients you want to limit.
+        </Text>
         <MultiSelectGroup
           options={NUTRIENT_GOALS}
           selected={preferences.decrease_goals}
-          onToggle={(val) => toggleSelection('decrease_goals', val)}
+          onToggle={(val) => toggleSelection("decrease_goals", val)}
         />
 
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={handleContinue}
+        >
           <Text style={styles.continueButtonText}>Continue to Preferences</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -159,12 +188,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContent: {
     padding: 20,
@@ -172,77 +201,77 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
   sectionHeader: {
     marginTop: 20,
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
     paddingBottom: 4,
   },
   sectionHeaderText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#4CAF50',
+    fontWeight: "600",
+    color: "#4CAF50",
   },
   helperText: {
     fontSize: 14,
-    color: '#888',
+    color: "#888",
     marginBottom: 12,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   groupContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginHorizontal: -4,
   },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
     margin: 4,
   },
   chipSelected: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
   },
   chipText: {
-    color: '#666',
+    color: "#666",
     fontSize: 14,
   },
   chipTextSelected: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
   continueButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 40,
-    alignItems: 'center',
-    shadowColor: '#4CAF50',
+    alignItems: "center",
+    shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
   continueButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 
