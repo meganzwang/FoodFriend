@@ -38,7 +38,7 @@ if not os.path.isfile(AGGREGATE_CSV):
 if not os.path.isfile(USER_PROFILES_CSV):
     with open(USER_PROFILES_CSV, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(["Timestamp", "Name", "Intolerances", "Diet", "Inc Goals", "Dec Goals", "Liked Flavors", "Disliked Flavors", "Liked Textures", "Disliked Textures", "Preferred Foods", "Disliked Foods"])
+        writer.writerow(["Timestamp", "Name", "Intolerances", "Diet", "Inc Goals", "Dec Goals", "Liked Flavors", "Disliked Flavors", "Liked Textures", "Disliked Textures", "Preferred Foods", "Disliked Foods", "Liked Recipe Ingredients", "Disliked Recipe Ingredients", "Liked Recipe Flavors", "Disliked Recipe Flavors", "Liked Recipe Textures", "Disliked Recipe Textures"])
 
 # Exact names from ingredients_final.csv for the 10 test items
 TARGET_INGREDIENTS = {
@@ -186,6 +186,13 @@ async def recommend_recipes(request: Request):
                 None
             )
 
+            # Extract ingredient names from extendedIngredients
+            ingredients = [
+                ing.get('name', '').lower().strip()
+                for ing in recipe.get('extendedIngredients', [])
+                if ing.get('name', '').strip()
+            ]
+
             recipes.append({
                 "id": recipe.get("id"),
                 "title": recipe.get("title", "Untitled Recipe"),
@@ -194,7 +201,8 @@ async def recommend_recipes(request: Request):
                 "readyInMinutes": recipe.get("readyInMinutes"),
                 "diets": recipe.get("diets", []),
                 "calories": calories,
-                "summary": recipe.get("summary", "")
+                "summary": recipe.get("summary", ""),
+                "ingredients": ingredients
             })
 
         return {
@@ -230,7 +238,13 @@ async def save_preferences(request: Request):
                 ", ".join(payload.get("liked_textures", []) or payload.get("texture", [])),
                 ", ".join(payload.get("disliked_textures", [])),
                 ", ".join(payload.get("preferred_foods", [])),
-                ", ".join(payload.get("disliked_foods", []))
+                ", ".join(payload.get("disliked_foods", [])),
+                ", ".join(payload.get("liked_recipe_ingredients", [])),
+                ", ".join(payload.get("disliked_recipe_ingredients", [])),
+                ", ".join(payload.get("liked_recipe_flavors", [])),
+                ", ".join(payload.get("disliked_recipe_flavors", [])),
+                ", ".join(payload.get("liked_recipe_textures", [])),
+                ", ".join(payload.get("disliked_recipe_textures", []))
             ])
             
         return {"status": "success", "message": "Preferences saved to server"}

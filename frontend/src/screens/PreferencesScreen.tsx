@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,10 +8,10 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   UserPreferences,
   RootStackParamList,
@@ -21,21 +21,27 @@ import {
   FLAVORS,
   TEXTURES,
   CUISINES,
-} from '../../types';
-import { CONFIG } from '../config';
+} from "../../types";
+import { CONFIG } from "../config";
 
 // Assuming we moved the JSON here or import it directly
-import ingredientData from '../ingredients.json';
+import ingredientData from "../ingredients.json";
 
-const STORAGE_KEY = '@user_preferences';
+const STORAGE_KEY = "@user_preferences";
 
-type PreferencesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Preferences'>;
+type PreferencesScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "Preferences"
+>;
 
 interface PreferencesScreenProps {
   navigation: PreferencesScreenNavigationProp;
 }
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({
+  title,
+  subtitle,
+}) => (
   <View style={styles.sectionHeader}>
     <Text style={styles.sectionHeaderText}>{title}</Text>
     {subtitle && <Text style={styles.sectionSubtitleText}>{subtitle}</Text>}
@@ -47,14 +53,17 @@ const MultiSelectGroup: React.FC<{
   selected: string[];
   onToggle: (option: any) => void;
   activeColor?: string;
-}> = ({ options, selected, onToggle, activeColor = '#4CAF50' }) => (
+}> = ({ options, selected, onToggle, activeColor = "#4CAF50" }) => (
   <View style={styles.groupContainer}>
     {options.map((option) => (
       <TouchableOpacity
         key={option}
         style={[
           styles.chip,
-          (selected || []).includes(option) && { backgroundColor: activeColor, borderColor: activeColor },
+          (selected || []).includes(option) && {
+            backgroundColor: activeColor,
+            borderColor: activeColor,
+          },
         ]}
         onPress={() => onToggle(option)}
       >
@@ -64,16 +73,18 @@ const MultiSelectGroup: React.FC<{
             (selected || []).includes(option) && styles.chipTextSelected,
           ]}
         >
-          {option.replace(/_/g, ' ')}
+          {option.replace(/_/g, " ")}
         </Text>
       </TouchableOpacity>
     ))}
   </View>
 );
 
-const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => {
+const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
+  navigation,
+}) => {
   const [preferences, setPreferences] = useState<UserPreferences>({
-    name: '',
+    name: "",
     intolerances: [],
     diet: [],
     increase_goals: [],
@@ -84,11 +95,17 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
     disliked_flavors: [],
     liked_textures: [],
     disliked_textures: [],
+    liked_recipe_ingredients: [],
+    disliked_recipe_ingredients: [],
+    liked_recipe_flavors: [],
+    disliked_recipe_flavors: [],
+    liked_recipe_textures: [],
+    disliked_recipe_textures: [],
     cuisines: [],
   });
   const [loading, setLoading] = useState(true);
-  const [preferredSearch, setPreferredSearch] = useState('');
-  const [dislikeSearch, setDislikeSearch] = useState('');
+  const [preferredSearch, setPreferredSearch] = useState("");
+  const [dislikeSearch, setDislikeSearch] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -102,23 +119,32 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         const parsed = JSON.parse(saved);
         if (parsed) {
           setPreferences({
-            name: parsed.name || '',
+            name: parsed.name || "",
             intolerances: parsed.intolerances || parsed.allergies || [],
             diet: parsed.diet || parsed.dietaryRestrictions || [],
             increase_goals: parsed.increase_goals || [],
             decrease_goals: parsed.decrease_goals || [],
-            preferred_foods: parsed.preferred_foods || parsed.preferredFoods || [],
-            disliked_foods: parsed.disliked_foods || parsed.dislikedIngredients || [],
+            preferred_foods:
+              parsed.preferred_foods || parsed.preferredFoods || [],
+            disliked_foods:
+              parsed.disliked_foods || parsed.dislikedIngredients || [],
             liked_flavors: parsed.liked_flavors || parsed.flavors || [],
             disliked_flavors: parsed.disliked_flavors || [],
             liked_textures: parsed.liked_textures || parsed.texture || [],
             disliked_textures: parsed.disliked_textures || [],
+            liked_recipe_ingredients: parsed.liked_recipe_ingredients || [],
+            disliked_recipe_ingredients:
+              parsed.disliked_recipe_ingredients || [],
+            liked_recipe_flavors: parsed.liked_recipe_flavors || [],
+            disliked_recipe_flavors: parsed.disliked_recipe_flavors || [],
+            liked_recipe_textures: parsed.liked_recipe_textures || [],
+            disliked_recipe_textures: parsed.disliked_recipe_textures || [],
             cuisines: parsed.cuisines || [],
           });
         }
       }
     } catch (e) {
-      console.error('Failed to load preferences', e);
+      console.error("Failed to load preferences", e);
     } finally {
       setLoading(false);
     }
@@ -129,35 +155,40 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
     try {
       // 1. Save locally first (Always succeeds immediately)
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-      
+
       // 2. Try to save to backend with a timeout
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          CONFIG.TIMEOUT_MS,
+        );
 
         const response = await fetch(`${CONFIG.API_URL}/api/save-preferences`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(preferences),
-          signal: controller.signal
+          signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
-          console.warn('Backend save failed, but local save succeeded');
+          console.warn("Backend save failed, but local save succeeded");
         }
       } catch (backendError) {
-        console.warn('Could not reach backend (timeout or network), preferences saved locally only');
+        console.warn(
+          "Could not reach backend (timeout or network), preferences saved locally only",
+        );
       }
 
       if (isContinue) {
-        navigation.navigate('IngredientRank');
+        navigation.navigate("IngredientRank");
       } else {
-        Alert.alert('Success', 'Preferences saved successfully!');
+        Alert.alert("Success", "Preferences saved successfully!");
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to save preferences.');
+      Alert.alert("Error", "Failed to save preferences.");
       console.error(e);
     } finally {
       setIsSaving(false);
@@ -178,21 +209,23 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
   const getFilteredIngredients = (query: string, excludeList: string[]) => {
     if (query.length < 2) return [];
     return ingredientData
-      .filter((ing) =>
-        ing && ing.toLowerCase().includes(query.toLowerCase()) &&
-        !(excludeList || []).includes(ing)
+      .filter(
+        (ing) =>
+          ing &&
+          ing.toLowerCase().includes(query.toLowerCase()) &&
+          !(excludeList || []).includes(ing),
       )
       .slice(0, 10);
   };
 
-  const filteredPreferred = useMemo(() => 
-    getFilteredIngredients(preferredSearch, preferences.preferred_foods), 
-    [preferredSearch, preferences.preferred_foods]
+  const filteredPreferred = useMemo(
+    () => getFilteredIngredients(preferredSearch, preferences.preferred_foods),
+    [preferredSearch, preferences.preferred_foods],
   );
 
-  const filteredDisliked = useMemo(() => 
-    getFilteredIngredients(dislikeSearch, preferences.disliked_foods), 
-    [dislikeSearch, preferences.disliked_foods]
+  const filteredDisliked = useMemo(
+    () => getFilteredIngredients(dislikeSearch, preferences.disliked_foods),
+    [dislikeSearch, preferences.disliked_foods],
   );
 
   if (loading) {
@@ -204,59 +237,77 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Your Preferences</Text>
-        <Text style={styles.subtitle}>Help us personalize your food recommendations</Text>
+        <Text style={styles.subtitle}>
+          Help us personalize your food recommendations
+        </Text>
 
-        <SectionHeader title="Your Name" subtitle="How should we address you?" />
+        <SectionHeader
+          title="Your Name"
+          subtitle="How should we address you?"
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Enter your name"
           value={preferences.name}
-          onChangeText={(val) => setPreferences(prev => ({ ...prev, name: val }))}
+          onChangeText={(val) =>
+            setPreferences((prev) => ({ ...prev, name: val }))
+          }
         />
 
-        <SectionHeader title="Allergies & Intolerances" subtitle="Ingredients I need to avoid" />
+        <SectionHeader
+          title="Allergies & Intolerances"
+          subtitle="Ingredients I need to avoid"
+        />
         <MultiSelectGroup
           options={INTOLERANCES}
           selected={preferences.intolerances}
-          onToggle={(val) => toggleSelection('intolerances', val)}
+          onToggle={(val) => toggleSelection("intolerances", val)}
           activeColor="#D32F2F"
         />
 
-        <SectionHeader title="Favorite Flavors" subtitle="Tastes I usually look for" />
+        <SectionHeader
+          title="Favorite Flavors"
+          subtitle="Tastes I usually look for"
+        />
         <MultiSelectGroup
           options={FLAVORS}
           selected={preferences.liked_flavors}
-          onToggle={(val) => toggleSelection('liked_flavors', val)}
+          onToggle={(val) => toggleSelection("liked_flavors", val)}
         />
 
-        <SectionHeader title="Favorite Textures" subtitle="Mouthfeels I enjoy" />
+        <SectionHeader
+          title="Favorite Textures"
+          subtitle="Mouthfeels I enjoy"
+        />
         <MultiSelectGroup
           options={TEXTURES}
           selected={preferences.liked_textures}
-          onToggle={(val) => toggleSelection('liked_textures', val)}
+          onToggle={(val) => toggleSelection("liked_textures", val)}
         />
 
         <View style={styles.aversionContainer}>
-          <SectionHeader 
-            title="Things I don't like" 
-            subtitle="I'd prefer to see fewer of these" 
+          <SectionHeader
+            title="Things I don't like"
+            subtitle="I'd prefer to see fewer of these"
           />
           <Text style={styles.aversionLabel}>Flavors to limit:</Text>
           <MultiSelectGroup
             options={FLAVORS}
             selected={preferences.disliked_flavors}
-            onToggle={(val) => toggleSelection('disliked_flavors', val)}
+            onToggle={(val) => toggleSelection("disliked_flavors", val)}
             activeColor="#D32F2F"
           />
-          
-          <Text style={[styles.aversionLabel, { marginTop: 12 }]}>Textures to limit:</Text>
+
+          <Text style={[styles.aversionLabel, { marginTop: 12 }]}>
+            Textures to limit:
+          </Text>
           <MultiSelectGroup
             options={TEXTURES}
             selected={preferences.disliked_textures}
-            onToggle={(val) => toggleSelection('disliked_textures', val)}
+            onToggle={(val) => toggleSelection("disliked_textures", val)}
             activeColor="#D32F2F"
           />
         </View>
@@ -265,11 +316,13 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         <MultiSelectGroup
           options={CUISINES}
           selected={preferences.cuisines}
-          onToggle={(val) => toggleSelection('cuisines', val)}
+          onToggle={(val) => toggleSelection("cuisines", val)}
         />
 
         <SectionHeader title="Preferred Foods" />
-        <Text style={styles.helperText}>Foods you enjoy and feel comfortable eating.</Text>
+        <Text style={styles.helperText}>
+          Foods you enjoy and feel comfortable eating.
+        </Text>
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -284,8 +337,8 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
                   key={ing}
                   style={styles.resultItem}
                   onPress={() => {
-                    toggleSelection('preferred_foods', ing);
-                    setPreferredSearch('');
+                    toggleSelection("preferred_foods", ing);
+                    setPreferredSearch("");
                   }}
                 >
                   <Text>{ing}</Text>
@@ -299,16 +352,23 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
           {preferences.preferred_foods.map((ing) => (
             <TouchableOpacity
               key={ing}
-              style={[styles.selectedChip, { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }]}
-              onPress={() => toggleSelection('preferred_foods', ing)}
+              style={[
+                styles.selectedChip,
+                { backgroundColor: "#E8F5E9", borderColor: "#A5D6A7" },
+              ]}
+              onPress={() => toggleSelection("preferred_foods", ing)}
             >
-              <Text style={[styles.selectedChipText, { color: '#2E7D32' }]}>{ing} ✕</Text>
+              <Text style={[styles.selectedChipText, { color: "#2E7D32" }]}>
+                {ing} ✕
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
         <SectionHeader title="Disliked Foods" />
-        <Text style={styles.helperText}>Foods or ingredients you want to avoid.</Text>
+        <Text style={styles.helperText}>
+          Foods or ingredients you want to avoid.
+        </Text>
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -323,8 +383,8 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
                   key={ing}
                   style={styles.resultItem}
                   onPress={() => {
-                    toggleSelection('disliked_foods', ing);
-                    setDislikeSearch('');
+                    toggleSelection("disliked_foods", ing);
+                    setDislikeSearch("");
                   }}
                 >
                   <Text>{ing}</Text>
@@ -339,7 +399,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
             <TouchableOpacity
               key={ing}
               style={styles.selectedChip}
-              onPress={() => toggleSelection('disliked_foods', ing)}
+              onPress={() => toggleSelection("disliked_foods", ing)}
             >
               <Text style={styles.selectedChipText}>{ing} ✕</Text>
             </TouchableOpacity>
@@ -359,7 +419,10 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.saveButton, { backgroundColor: '#2196F3', marginTop: 12 }]}
+          style={[
+            styles.saveButton,
+            { backgroundColor: "#2196F3", marginTop: 12 },
+          ]}
           onPress={() => savePreferences(true)}
           disabled={isSaving}
         >
@@ -373,12 +436,12 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   centered: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContent: {
     padding: 20,
@@ -386,101 +449,101 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
     marginBottom: 24,
   },
   sectionHeader: {
     marginTop: 20,
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: "#E0E0E0",
     paddingBottom: 4,
   },
   sectionHeaderText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#4CAF50',
+    fontWeight: "600",
+    color: "#4CAF50",
   },
   sectionSubtitleText: {
     fontSize: 12,
-    color: '#888',
+    color: "#888",
     marginTop: 2,
   },
   aversionContainer: {
-    backgroundColor: '#FFF5F5',
+    backgroundColor: "#FFF5F5",
     padding: 12,
     borderRadius: 12,
     marginTop: 20,
     borderWidth: 1,
-    borderColor: '#FFEBEE',
+    borderColor: "#FFEBEE",
   },
   aversionLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#D32F2F',
+    fontWeight: "600",
+    color: "#D32F2F",
     marginBottom: 8,
     marginLeft: 4,
   },
   helperText: {
     fontSize: 14,
-    color: '#888',
+    color: "#888",
     marginBottom: 12,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   groupContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginHorizontal: -4,
   },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
     margin: 4,
   },
   chipText: {
-    color: '#666',
+    color: "#666",
     fontSize: 14,
   },
   chipTextSelected: {
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
   searchContainer: {
     zIndex: 1,
   },
   searchInput: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
     fontSize: 16,
   },
   resultsContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 8,
     marginTop: 4,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
     maxHeight: 200,
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     left: 0,
     right: 0,
     zIndex: 1000,
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -488,45 +551,45 @@ const styles = StyleSheet.create({
   resultItem: {
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: "#F0F0F0",
   },
   selectedIngredients: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     marginTop: 12,
     marginBottom: 8,
   },
   selectedChip: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: "#FFEBEE",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 4,
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#FFCDD2',
+    borderColor: "#FFCDD2",
   },
   selectedChipText: {
-    color: '#D32F2F',
+    color: "#D32F2F",
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 32,
-    alignItems: 'center',
-    shadowColor: '#4CAF50',
+    alignItems: "center",
+    shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
   saveButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 

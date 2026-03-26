@@ -75,6 +75,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
     disliked_flavors: [],
     liked_textures: [],
     disliked_textures: [],
+    liked_recipe_ingredients: [],
+    disliked_recipe_ingredients: [],
+    liked_recipe_flavors: [],
+    disliked_recipe_flavors: [],
+    liked_recipe_textures: [],
+    disliked_recipe_textures: [],
     cuisines: [],
   });
   const [loading, setLoading] = useState(true);
@@ -100,6 +106,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
             disliked_flavors: parsed.disliked_flavors || [],
             liked_textures: parsed.liked_textures || parsed.texture || [],
             disliked_textures: parsed.disliked_textures || [],
+            liked_recipe_ingredients: parsed.liked_recipe_ingredients || [],
+            disliked_recipe_ingredients:
+              parsed.disliked_recipe_ingredients || [],
+            liked_recipe_flavors: parsed.liked_recipe_flavors || [],
+            disliked_recipe_flavors: parsed.disliked_recipe_flavors || [],
+            liked_recipe_textures: parsed.liked_recipe_textures || [],
+            disliked_recipe_textures: parsed.disliked_recipe_textures || [],
             cuisines: parsed.cuisines || [],
           });
         }
