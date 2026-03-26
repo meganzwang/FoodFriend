@@ -23,3 +23,4 @@ backend/__pycache__/
 # Secrets and Config
 # This file contains your actual keys and should NOT be in git
 FoodFriend/src/config/smart-config.ts
+.env
