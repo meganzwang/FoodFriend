@@ -26,3 +26,4 @@ FoodFriend/src/config/smart-config.ts
 .conda/
 venv/
 .venv/
+.env
