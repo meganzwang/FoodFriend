@@ -29,6 +29,14 @@ class FoodFriendModel:
         # Binary tags are everything else (excluding metadata)
         metadata = ['id', 'name', 'flavor', 'texture']
         self.tag_cols = [c for c in self.df.columns if c not in metadata + self.nutrition_cols + self.macro_pct_cols]
+        self.feature_cols = self.tag_cols + self.nutrition_cols + self.macro_pct_cols
+
+        # Cache normalized names for fast preferred/disliked food matching
+        self.df['_normalized_name'] = self.df['name'].astype(str).map(self._normalize_food_name)
+
+        # Weights for blending preferred/disliked food vectors into user intent
+        self.PREFERRED_FOOD_WEIGHT = 0.35
+        self.DISLIKED_FOOD_WEIGHT = 0.40
 
         # Stage 1: Hard-coded Filtering Criteria (Safety & Diet)
         self.HARD_FILTERS = {
@@ -75,9 +83,43 @@ class FoodFriendModel:
         normalized = re.sub(r'\s+', '_', normalized)
         return self.FILTER_KEY_ALIASES.get(normalized, normalized)
 
+    def _normalize_food_name(self, value):
+        normalized = str(value or '').strip().lower()
+        normalized = re.sub(r'\s+', ' ', normalized)
+        return normalized
+
+    def _get_average_food_vector(self, food_names):
+        if not food_names:
+            return None
+
+        normalized_names = [
+            self._normalize_food_name(food)
+            for food in food_names
+            if str(food or '').strip()
+        ]
+
+        if not normalized_names:
+            return None
+
+        exact_matches = self.df[self.df['_normalized_name'].isin(normalized_names)]
+        if not exact_matches.empty:
+            return exact_matches[self.feature_cols].mean().values
+
+        # Fallback: partial matching if exact names are not found
+        fallback_rows = []
+        for normalized_name in normalized_names:
+            contains_match = self.df[self.df['_normalized_name'].str.contains(re.escape(normalized_name), na=False)]
+            if not contains_match.empty:
+                fallback_rows.append(contains_match.iloc[0][self.feature_cols].values)
+
+        if fallback_rows:
+            return np.mean(np.vstack(fallback_rows), axis=0)
+
+        return None
+
     def _create_user_vector(self, preferences):
         """Builds a vector where likes = 1, dislikes = -1, and nutrient goals = 1/0."""
-        vec_size = len(self.tag_cols) + len(self.nutrition_cols) + len(self.macro_pct_cols)
+        vec_size = len(self.feature_cols)
         user_vec = np.zeros(vec_size)
         
         # 1. Map Tags (Flavors/Textures)
@@ -111,6 +153,22 @@ class FoodFriendModel:
             # We target 0 for things they want to decrease
             if goal in self.nutrition_cols:
                 user_vec[offset + self.nutrition_cols.index(goal)] = 0.0
+
+        # 3. Blend preferred/disliked foods into user vector
+        preferred_foods = preferences.get("preferred_foods", []) or preferences.get("preferredFoods", [])
+        disliked_foods = (
+            preferences.get("disliked_foods", [])
+            or preferences.get("dislikedFoods", [])
+            or preferences.get("dislikedIngredients", [])
+        )
+
+        preferred_food_vector = self._get_average_food_vector(preferred_foods)
+        if preferred_food_vector is not None:
+            user_vec += self.PREFERRED_FOOD_WEIGHT * preferred_food_vector
+
+        disliked_food_vector = self._get_average_food_vector(disliked_foods)
+        if disliked_food_vector is not None:
+            user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_food_vector
 
         return user_vec
 
@@ -179,7 +237,7 @@ class FoodFriendModel:
 
         # 4. Score ranked candidates
         user_vector = self._create_user_vector(user_profile)
-        feature_cols = self.tag_cols + self.nutrition_cols + self.macro_pct_cols
+        feature_cols = self.feature_cols
         
         if not ranked_candidates.empty:
             scores = []
@@ -214,7 +272,7 @@ class FoodFriendModel:
 
         # 3. Vector Match
         user_vector = self._create_user_vector(user_profile)
-        feature_cols = self.tag_cols + self.nutrition_cols + self.macro_pct_cols
+        feature_cols = self.feature_cols
         
         scores = []
         user_norm = np.linalg.norm(user_vector)
