@@ -35,9 +35,10 @@ interface PreferencesScreenProps {
   navigation: PreferencesScreenNavigationProp;
 }
 
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
   <View style={styles.sectionHeader}>
     <Text style={styles.sectionHeaderText}>{title}</Text>
+    {subtitle && <Text style={styles.sectionSubtitleText}>{subtitle}</Text>}
   </View>
 );
 
@@ -45,14 +46,15 @@ const MultiSelectGroup: React.FC<{
   options: string[];
   selected: string[];
   onToggle: (option: any) => void;
-}> = ({ options, selected, onToggle }) => (
+  activeColor?: string;
+}> = ({ options, selected, onToggle, activeColor = '#4CAF50' }) => (
   <View style={styles.groupContainer}>
     {options.map((option) => (
       <TouchableOpacity
         key={option}
         style={[
           styles.chip,
-          (selected || []).includes(option) && styles.chipSelected,
+          (selected || []).includes(option) && { backgroundColor: activeColor, borderColor: activeColor },
         ]}
         onPress={() => onToggle(option)}
       >
@@ -71,14 +73,17 @@ const MultiSelectGroup: React.FC<{
 
 const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => {
   const [preferences, setPreferences] = useState<UserPreferences>({
+    name: '',
     intolerances: [],
     diet: [],
     increase_goals: [],
     decrease_goals: [],
     preferred_foods: [],
     disliked_foods: [],
-    flavors: [],
-    texture: [],
+    liked_flavors: [],
+    disliked_flavors: [],
+    liked_textures: [],
+    disliked_textures: [],
     cuisines: [],
   });
   const [loading, setLoading] = useState(true);
@@ -97,14 +102,17 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         const parsed = JSON.parse(saved);
         if (parsed) {
           setPreferences({
+            name: parsed.name || '',
             intolerances: parsed.intolerances || parsed.allergies || [],
             diet: parsed.diet || parsed.dietaryRestrictions || [],
             increase_goals: parsed.increase_goals || [],
             decrease_goals: parsed.decrease_goals || [],
             preferred_foods: parsed.preferred_foods || parsed.preferredFoods || [],
             disliked_foods: parsed.disliked_foods || parsed.dislikedIngredients || [],
-            flavors: parsed.flavors || [],
-            texture: parsed.texture || [],
+            liked_flavors: parsed.liked_flavors || parsed.flavors || [],
+            disliked_flavors: parsed.disliked_flavors || [],
+            liked_textures: parsed.liked_textures || parsed.texture || [],
+            disliked_textures: parsed.disliked_textures || [],
             cuisines: parsed.cuisines || [],
           });
         }
@@ -201,26 +209,57 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({ navigation }) => 
         <Text style={styles.title}>Your Preferences</Text>
         <Text style={styles.subtitle}>Help us personalize your food recommendations</Text>
 
-        <SectionHeader title="Intolerances" />
+        <SectionHeader title="Your Name" subtitle="How should we address you?" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Enter your name"
+          value={preferences.name}
+          onChangeText={(val) => setPreferences(prev => ({ ...prev, name: val }))}
+        />
+
+        <SectionHeader title="Allergies & Intolerances" subtitle="Ingredients I need to avoid" />
         <MultiSelectGroup
           options={INTOLERANCES}
           selected={preferences.intolerances}
           onToggle={(val) => toggleSelection('intolerances', val)}
+          activeColor="#D32F2F"
         />
 
-        <SectionHeader title="Preferred Flavors" />
+        <SectionHeader title="Favorite Flavors" subtitle="Tastes I usually look for" />
         <MultiSelectGroup
           options={FLAVORS}
-          selected={preferences.flavors}
-          onToggle={(val) => toggleSelection('flavors', val)}
+          selected={preferences.liked_flavors}
+          onToggle={(val) => toggleSelection('liked_flavors', val)}
         />
 
-        <SectionHeader title="Preferred Textures" />
+        <SectionHeader title="Favorite Textures" subtitle="Mouthfeels I enjoy" />
         <MultiSelectGroup
           options={TEXTURES}
-          selected={preferences.texture}
-          onToggle={(val) => toggleSelection('texture', val)}
+          selected={preferences.liked_textures}
+          onToggle={(val) => toggleSelection('liked_textures', val)}
         />
+
+        <View style={styles.aversionContainer}>
+          <SectionHeader 
+            title="Things I don't like" 
+            subtitle="I'd prefer to see fewer of these" 
+          />
+          <Text style={styles.aversionLabel}>Flavors to limit:</Text>
+          <MultiSelectGroup
+            options={FLAVORS}
+            selected={preferences.disliked_flavors}
+            onToggle={(val) => toggleSelection('disliked_flavors', val)}
+            activeColor="#D32F2F"
+          />
+          
+          <Text style={[styles.aversionLabel, { marginTop: 12 }]}>Textures to limit:</Text>
+          <MultiSelectGroup
+            options={TEXTURES}
+            selected={preferences.disliked_textures}
+            onToggle={(val) => toggleSelection('disliked_textures', val)}
+            activeColor="#D32F2F"
+          />
+        </View>
 
         <SectionHeader title="Preferred Cuisines" />
         <MultiSelectGroup
@@ -368,6 +407,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4CAF50',
   },
+  sectionSubtitleText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  aversionContainer: {
+    backgroundColor: '#FFF5F5',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#FFEBEE',
+  },
+  aversionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#D32F2F',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   helperText: {
     fontSize: 14,
     color: '#888',
@@ -387,10 +446,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     margin: 4,
-  },
-  chipSelected: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
   },
   chipText: {
     color: '#666',

@@ -81,7 +81,11 @@ class FoodFriendModel:
         user_vec = np.zeros(vec_size)
         
         # 1. Map Tags (Flavors/Textures)
-        for pref in preferences.get("liked_flavors", []) + preferences.get("liked_textures", []):
+        # Combine new explicit keys with legacy keys for backward compatibility
+        liked_flavors = preferences.get("liked_flavors", []) or preferences.get("flavors", [])
+        liked_textures = preferences.get("liked_textures", []) or preferences.get("texture", [])
+        
+        for pref in liked_flavors + liked_textures:
             if pref in self.tag_cols:
                 user_vec[self.tag_cols.index(pref)] = 1.0
                 
@@ -117,14 +121,14 @@ class FoodFriendModel:
         is_ef = df['name'].str.contains(r'egg[ -]free', case=False, na=False)
         is_v = df['name'].str.contains(r'vegan', case=False, na=False)
         
-        cake_pattern = re.compile(r'\b(cupcake|cake)\b', re.IGNORECASE)
+        cake_pattern = re.compile(r'\b(?:cupcake|cake)\b', re.IGNORECASE)
         is_cake = df['name'].str.contains(cake_pattern, na=False)
 
         for f_key in active_filters:
             keywords = self.HARD_FILTERS.get(f_key, [])
             if not keywords: continue
             
-            pattern = re.compile(r'\b(' + '|'.join(map(re.escape, keywords)) + r')', re.IGNORECASE)
+            pattern = re.compile(r'\b(?:' + '|'.join(map(re.escape, keywords)) + r')', re.IGNORECASE)
             matches = df['name'].str.contains(pattern, na=False)
             
             # Apply exemptions
@@ -188,6 +192,9 @@ class FoodFriendModel:
                     scores.append(1 - cosine(user_vector, val))
             ranked_candidates['score'] = scores
             ranked_candidates = ranked_candidates.sort_values(by='score', ascending=False)
+        else:
+            # Ensure 'score' column exists even if empty to avoid KeyError
+            ranked_candidates['score'] = pd.Series(dtype='float64')
         
         return ranked_candidates[['name', 'score']].to_dict(orient='records'), filtered_df[['name', 'reason']].to_dict(orient='records')
 
