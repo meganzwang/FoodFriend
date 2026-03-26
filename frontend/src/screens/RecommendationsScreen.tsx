@@ -9,6 +9,8 @@ import {
   Image,
   Button,
   Alert,
+  Linking,
+  TouchableOpacity,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MainTabParamList } from "../../types";
@@ -101,6 +103,23 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     // In a real app, you'd send this feedback to your backend to refine the model
   };
 
+  const handleOpenRecipe = async (sourceUrl: string) => {
+    if (!sourceUrl) {
+      Alert.alert("Error", "Recipe link not available.");
+      return;
+    }
+    try {
+      const supported = await Linking.canOpenURL(sourceUrl);
+      if (supported) {
+        await Linking.openURL(sourceUrl);
+      } else {
+        Alert.alert("Error", "Cannot open recipe link.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to open recipe link.");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Your Weekly Recommendations</Text>
@@ -137,6 +156,14 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
                     ? ` • ${recipe.diets.join(", ")}`
                     : ""}
                 </Text>
+                {recipe.sourceUrl && (
+                  <TouchableOpacity
+                    style={styles.recipeLink}
+                    onPress={() => handleOpenRecipe(recipe.sourceUrl)}
+                  >
+                    <Text style={styles.recipeLinkText}>View Recipe →</Text>
+                  </TouchableOpacity>
+                )}
                 <View style={styles.buttonRow}>
                   <Button
                     title="Try It"
@@ -222,6 +249,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     marginTop: 10,
+  },
+  recipeLink: {
+    marginVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#2196F3",
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  recipeLinkText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
 
