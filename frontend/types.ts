@@ -75,17 +75,22 @@ export const CUISINES = [
 
 // Interface to capture all user-defined preferences for the food recommendation model
 export interface UserPreferences {
+  name?: string;
   intolerances: string[];
   diet: string[];
   increase_goals: string[];
   decrease_goals: string[];
   preferred_foods: string[];
   disliked_foods: string[];
-  flavors: string[];
-  texture: string[];
+  liked_flavors: string[];
+  disliked_flavors: string[];
+  liked_textures: string[];
+  disliked_textures: string[];
   cuisines: string[];
   
   // Legacy fields (optional for backward compatibility)
+  flavors?: string[];
+  texture?: string[];
   allergies?: string[];
   preferredFoods?: string[];
   dislikedIngredients?: string[];
