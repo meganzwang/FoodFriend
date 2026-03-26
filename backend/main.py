@@ -7,7 +7,11 @@ import socket
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from model import FoodFriendModel
+from spoon_client import SpoonacularClient
+from dotenv import load_dotenv
 from datetime import datetime
+
+load_dotenv()
 
 app = FastAPI()
 model = FoodFriendModel()
@@ -49,6 +53,16 @@ TARGET_INGREDIENTS = {
     "Tofu": "tofu",
     "Shrimp": "shrimp"
 }
+
+MAX_TOP_INGREDIENTS = 5
+
+def normalize_profile_for_model(user_profile):
+    normalized = dict(user_profile or {})
+    if "increase_nutrients" not in normalized:
+        normalized["increase_nutrients"] = normalized.get("increase_goals", [])
+    if "decrease_nutrients" not in normalized:
+        normalized["decrease_nutrients"] = normalized.get("decrease_goals", [])
+    return normalized
 
 def load_experimental_subset():
     subset = []
@@ -105,10 +119,9 @@ async def rank_ingredients(request: Request):
         user_profile = await request.json()
         print(f"DEBUG: Ranking for profile: {user_profile}")
         
-        ingredients = load_experimental_subset()
-        # Ensure we pass the raw lowercase names to the model for matching
-        ingredient_names = [i['name'].lower() for i in ingredients]
-        ranked, filtered = model.rank(ingredient_names, user_profile)
+        normalized_profile = normalize_profile_for_model(user_profile)
+        ranked = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS)
+        filtered = []
         
         # --- LOG TO AGGREGATE CSV ---
         with open(AGGREGATE_CSV, mode='a', newline='', encoding='utf-8') as f:
@@ -133,6 +146,67 @@ async def rank_ingredients(request: Request):
         import traceback
         traceback.print_exc()
         print(f"ERROR in rank_ingredients: {str(e)}")
+        return {"error": str(e)}
+
+
+@app.post("/api/recommend-recipes")
+async def recommend_recipes(request: Request):
+    try:
+        user_profile = await request.json()
+
+        api_key = os.getenv("SPOONACULAR_API_KEY")
+        if not api_key:
+            return {"error": "SPOONACULAR_API_KEY is missing in backend environment."}
+
+        normalized_profile = normalize_profile_for_model(user_profile)
+        top_ranked = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS)
+        filtered = []
+        top_ingredient_names = [item.get('name') for item in top_ranked if item.get('name')]
+
+        if not top_ingredient_names:
+            return {
+                "top_ingredients": [],
+                "ranked": top_ranked,
+                "filtered": filtered,
+                "recipes": []
+            }
+
+        spoon = SpoonacularClient(api_key=api_key)
+        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=20)
+
+        recipes = []
+        for recipe in spoon_recipes:
+            nutrients = recipe.get('nutrition', {}).get('nutrients', [])
+            calories = next(
+                (
+                    nutrient.get('amount')
+                    for nutrient in nutrients
+                    if str(nutrient.get('name', '')).lower() == 'calories'
+                ),
+                None
+            )
+
+            recipes.append({
+                "id": recipe.get("id"),
+                "title": recipe.get("title", "Untitled Recipe"),
+                "image": recipe.get("image", ""),
+                "sourceUrl": recipe.get("sourceUrl", ""),
+                "readyInMinutes": recipe.get("readyInMinutes"),
+                "diets": recipe.get("diets", []),
+                "calories": calories,
+                "summary": recipe.get("summary", "")
+            })
+
+        return {
+            "top_ingredients": top_ingredient_names,
+            "ranked": top_ranked,
+            "filtered": filtered,
+            "recipes": recipes
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"ERROR in recommend_recipes: {str(e)}")
         return {"error": str(e)}
 
 @app.post("/api/save-preferences")
