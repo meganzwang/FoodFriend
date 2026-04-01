@@ -103,17 +103,18 @@ class FoodFriendModel:
 
         exact_matches = self.df[self.df['_normalized_name'].isin(normalized_names)]
         if not exact_matches.empty:
-            return exact_matches[self.feature_cols].mean().values
+            return exact_matches[self.feature_cols].astype(float).mean().to_numpy(dtype=np.float64)
 
         # Fallback: partial matching if exact names are not found
         fallback_rows = []
         for normalized_name in normalized_names:
             contains_match = self.df[self.df['_normalized_name'].str.contains(re.escape(normalized_name), na=False)]
             if not contains_match.empty:
-                fallback_rows.append(contains_match.iloc[0][self.feature_cols].values)
+                fallback_row = contains_match[self.feature_cols].iloc[0].to_numpy(dtype=np.float64)
+                fallback_rows.append(fallback_row)
 
         if fallback_rows:
-            return np.mean(np.vstack(fallback_rows), axis=0)
+            return np.mean(np.vstack(fallback_rows), axis=0, dtype=np.float64)
 
         return None
 
@@ -164,10 +165,12 @@ class FoodFriendModel:
 
         preferred_food_vector = self._get_average_food_vector(preferred_foods)
         if preferred_food_vector is not None:
+            preferred_food_vector = np.asarray(preferred_food_vector, dtype=np.float64)
             user_vec += self.PREFERRED_FOOD_WEIGHT * preferred_food_vector
 
         disliked_food_vector = self._get_average_food_vector(disliked_foods)
         if disliked_food_vector is not None:
+            disliked_food_vector = np.asarray(disliked_food_vector, dtype=np.float64)
             user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_food_vector
 
         # 4. Blend recipe feedback (ingredients, flavors, textures) into user vector
@@ -176,10 +179,12 @@ class FoodFriendModel:
 
         liked_recipe_ingredient_vector = self._get_average_food_vector(liked_recipe_ingredients)
         if liked_recipe_ingredient_vector is not None:
+            liked_recipe_ingredient_vector = np.asarray(liked_recipe_ingredient_vector, dtype=np.float64)
             user_vec += self.PREFERRED_FOOD_WEIGHT * liked_recipe_ingredient_vector
 
         disliked_recipe_ingredient_vector = self._get_average_food_vector(disliked_recipe_ingredients)
         if disliked_recipe_ingredient_vector is not None:
+            disliked_recipe_ingredient_vector = np.asarray(disliked_recipe_ingredient_vector, dtype=np.float64)
             user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_recipe_ingredient_vector
 
         # Handle liked/disliked recipe flavors and textures
