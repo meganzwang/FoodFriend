@@ -28,6 +28,7 @@ interface GoalsScreenProps {
 }
 
 const STORAGE_KEY = "@user_preferences";
+const USER_ID_KEY = "@food_friend_user_id";
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.sectionHeader}>
@@ -137,7 +138,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
 
   const handleContinue = async () => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+      // Preserve user_id so it doesn't get wiped on each screen save
+      const userId = await AsyncStorage.getItem(USER_ID_KEY);
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...preferences, user_id: userId }),
+      );
       navigation.navigate("Preferences");
     } catch (e) {
       Alert.alert("Error", "Failed to save goals.");

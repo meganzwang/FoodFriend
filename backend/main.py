@@ -4,7 +4,9 @@ import os
 import json
 import re
 import socket
-from fastapi import FastAPI, Request
+import sqlite3
+import uuid
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from model import FoodFriendModel
 from spoon_client import SpoonacularClient
@@ -27,20 +29,48 @@ app.add_middleware(
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "final_vectorized_ingredients.csv")
 AGGREGATE_CSV = os.path.join(os.path.dirname(__file__), "..", "user_testing_aggregate.csv")
-USER_PROFILES_CSV = os.path.join(os.path.dirname(__file__), "..", "user_profiles.csv")
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "foodfriend.db")
 
-# Initialize CSVs with headers if they don't exist
+# ─── SQLite setup ─────────────────────────────────────────────────────────────
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id          TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL,
+            preferences TEXT NOT NULL DEFAULT '{}'
+        )
+    """)
+    conn.commit()
+    conn.close()
+    print(f"SQLite DB ready at {DB_PATH}")
+
+init_db()
+
+# ─── Analytics CSV (kept for aggregate research logging) ─────────────────────
+
 if not os.path.isfile(AGGREGATE_CSV):
     with open(AGGREGATE_CSV, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(["Timestamp", "Intolerances", "Diet", "Inc Goals", "Dec Goals", "Liked Flavors", "Disliked Flavors", "Liked Texture", "Disliked Texture", "Ranked Result", "Filtered Out"])
+        writer.writerow([
+            "Timestamp", "UserID", "Name",
+            "Intolerances", "Diet", "Inc Goals", "Dec Goals",
+            "Liked Flavors", "Disliked Flavors",
+            "Liked Texture", "Disliked Texture",
+            "Ranked Result", "Filtered Out",
+        ])
 
-if not os.path.isfile(USER_PROFILES_CSV):
-    with open(USER_PROFILES_CSV, mode='w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Timestamp", "Name", "Intolerances", "Diet", "Inc Goals", "Dec Goals", "Liked Flavors", "Disliked Flavors", "Liked Textures", "Disliked Textures", "Preferred Foods", "Disliked Foods", "Liked Recipe Ingredients", "Disliked Recipe Ingredients", "Liked Recipe Flavors", "Disliked Recipe Flavors", "Liked Recipe Textures", "Disliked Recipe Textures"])
+# ─── Ingredient constants ─────────────────────────────────────────────────────
 
-# Exact names from ingredients_final.csv for the 10 test items
 TARGET_INGREDIENTS = {
     "Chicken Breast": "bone in chicken breast",
     "Peanut Butter": "crunchy peanut butter",
@@ -51,10 +81,12 @@ TARGET_INGREDIENTS = {
     "Almond": "almonds",
     "Broccoli": "broccoli",
     "Tofu": "tofu",
-    "Shrimp": "shrimp"
+    "Shrimp": "shrimp",
 }
 
 MAX_TOP_INGREDIENTS = 5
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def normalize_profile_for_model(user_profile):
     normalized = dict(user_profile or {})
@@ -64,6 +96,7 @@ def normalize_profile_for_model(user_profile):
         normalized["decrease_nutrients"] = normalized.get("decrease_goals", [])
     return normalized
 
+
 def load_experimental_subset():
     subset = []
     if not os.path.exists(CSV_PATH):
@@ -71,20 +104,19 @@ def load_experimental_subset():
         return []
 
     targets_lower = {v.lower() for v in TARGET_INGREDIENTS.values()}
-    found_targets = set()
 
     with open(CSV_PATH, mode='r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             name_lower = row['name'].lower().strip()
             if name_lower in targets_lower:
-                found_targets.add(name_lower)
-                
                 def safe_float(val):
-                    try: 
-                        if not val or val.strip() == "": return 0.0
+                    try:
+                        if not val or val.strip() == "":
+                            return 0.0
                         return float(val)
-                    except: return 0.0
+                    except:
+                        return 0.0
 
                 ingredient = {
                     "name": row['name'].title(),
@@ -99,11 +131,14 @@ def load_experimental_subset():
                         "fiber": "high" if safe_float(row.get('fiber_amount')) > 4 else "low",
                         "iron": "high" if safe_float(row.get('iron_amount')) > 2 else "low",
                     },
-                    "cuisines": [] 
+                    "cuisines": [],
                 }
                 subset.append(ingredient)
-    
+
     return subset
+
+
+# ─── Health ───────────────────────────────────────────────────────────────────
 
 @app.get("/")
 async def read_root():
@@ -113,21 +148,143 @@ async def read_root():
 async def ping():
     return {"status": "pong", "timestamp": datetime.now().isoformat()}
 
+
+# ─── User management ──────────────────────────────────────────────────────────
+
+@app.post("/api/users")
+async def create_user(request: Request):
+    """
+    Register a new tester. Supply { "name": "Alice" }.
+    Returns a short 8-character ID they can use to log back in.
+    """
+    body = await request.json()
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+
+    # Readable ID: up to 4 letters of name + 2 random digits, e.g. ALEX-42
+    import random
+    name_part = re.sub(r"[^A-Z]", "", name.upper())[:4] or "USER"
+    conn_check = get_db()
+    for _ in range(20):
+        user_id = f"{name_part}-{random.randint(10, 99)}"
+        if not conn_check.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone():
+            break
+    conn_check.close()
+
+    now = datetime.now().isoformat()
+
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO users (id, name, created_at, updated_at, preferences) VALUES (?, ?, ?, ?, ?)",
+            (user_id, name, now, now, "{}"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"user_id": user_id, "name": name, "created_at": now}
+
+
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: str):
+    """
+    Load a returning user's profile by their ID.
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id.upper(),)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found. Check your ID and try again.")
+
+    return {
+        "user_id": row["id"],
+        "name": row["name"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "preferences": json.loads(row["preferences"]),
+    }
+
+
+@app.put("/api/users/{user_id}/preferences")
+async def update_user_preferences(user_id: str, request: Request):
+    """
+    Save the full preferences object for a user.
+    """
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id FROM users WHERE id = ?", (user_id.upper(),)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        payload = await request.json()
+        payload.pop("user_id", None)  # don't store the ID inside the blob
+
+        conn.execute(
+            "UPDATE users SET preferences = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(payload), datetime.now().isoformat(), user_id.upper()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"status": "success", "user_id": user_id.upper()}
+
+
+# ─── Legacy save-preferences (backward compat + local-only saves) ─────────────
+
+@app.post("/api/save-preferences")
+async def save_preferences(request: Request):
+    try:
+        payload = await request.json()
+        user_id = (payload.get("user_id") or "").upper()
+
+        if user_id:
+            conn = get_db()
+            try:
+                row = conn.execute(
+                    "SELECT id FROM users WHERE id = ?", (user_id,)
+                ).fetchone()
+                if row:
+                    prefs = {k: v for k, v in payload.items() if k != "user_id"}
+                    conn.execute(
+                        "UPDATE users SET preferences = ?, updated_at = ? WHERE id = ?",
+                        (json.dumps(prefs), datetime.now().isoformat(), user_id),
+                    )
+                    conn.commit()
+            finally:
+                conn.close()
+
+        return {"status": "success", "message": "Preferences saved"}
+    except Exception as e:
+        print(f"ERROR in save_preferences: {e}")
+        return {"error": str(e)}
+
+
+# ─── Rank ingredients ─────────────────────────────────────────────────────────
+
 @app.post("/api/rank-ingredients")
 async def rank_ingredients(request: Request):
     try:
         user_profile = await request.json()
-        print(f"DEBUG: Ranking for profile: {user_profile}")
-        
         normalized_profile = normalize_profile_for_model(user_profile)
         ranked = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS)
         filtered = []
-        
-        # --- LOG TO AGGREGATE CSV ---
+
         with open(AGGREGATE_CSV, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow([
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_profile.get("user_id", ""),
+                user_profile.get("name", ""),
                 ", ".join(user_profile.get("intolerances", [])),
                 ", ".join(user_profile.get("diet", [])),
                 ", ".join(user_profile.get("increase_goals", [])),
@@ -137,17 +294,17 @@ async def rank_ingredients(request: Request):
                 ", ".join(user_profile.get("liked_textures", []) or user_profile.get("texture", [])),
                 ", ".join(user_profile.get("disliked_textures", [])),
                 " > ".join([f"{i['name']} ({i['score']})" for i in ranked]),
-                ", ".join([f"{i['name']} ({i['reason']})" for i in filtered])
+                ", ".join([f"{i['name']} ({i['reason']})" for i in filtered]),
             ])
-        # ----------------------------
 
         return {"ranked": ranked, "filtered": filtered}
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"ERROR in rank_ingredients: {str(e)}")
         return {"error": str(e)}
 
+
+# ─── Recommend recipes ────────────────────────────────────────────────────────
 
 @app.post("/api/recommend-recipes")
 async def recommend_recipes(request: Request):
@@ -164,12 +321,7 @@ async def recommend_recipes(request: Request):
         top_ingredient_names = [item.get('name') for item in top_ranked if item.get('name')]
 
         if not top_ingredient_names:
-            return {
-                "top_ingredients": [],
-                "ranked": top_ranked,
-                "filtered": filtered,
-                "recipes": []
-            }
+            return {"top_ingredients": [], "ranked": top_ranked, "filtered": filtered, "recipes": []}
 
         spoon = SpoonacularClient(api_key=api_key)
         spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=20)
@@ -178,21 +330,14 @@ async def recommend_recipes(request: Request):
         for recipe in spoon_recipes:
             nutrients = recipe.get('nutrition', {}).get('nutrients', [])
             calories = next(
-                (
-                    nutrient.get('amount')
-                    for nutrient in nutrients
-                    if str(nutrient.get('name', '')).lower() == 'calories'
-                ),
-                None
+                (n.get('amount') for n in nutrients if str(n.get('name', '')).lower() == 'calories'),
+                None,
             )
-
-            # Extract ingredient names from extendedIngredients
             ingredients = [
                 ing.get('name', '').lower().strip()
                 for ing in recipe.get('extendedIngredients', [])
                 if ing.get('name', '').strip()
             ]
-
             recipes.append({
                 "id": recipe.get("id"),
                 "title": recipe.get("title", "Untitled Recipe"),
@@ -202,63 +347,29 @@ async def recommend_recipes(request: Request):
                 "diets": recipe.get("diets", []),
                 "calories": calories,
                 "summary": recipe.get("summary", ""),
-                "ingredients": ingredients
+                "ingredients": ingredients,
             })
 
         return {
             "top_ingredients": top_ingredient_names,
             "ranked": top_ranked,
             "filtered": filtered,
-            "recipes": recipes
+            "recipes": recipes,
         }
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"ERROR in recommend_recipes: {str(e)}")
         return {"error": str(e)}
 
-@app.post("/api/save-preferences")
-async def save_preferences(request: Request):
-    try:
-        payload = await request.json()
-        print(f"Received preferences: {payload}")
-        
-        # Log to user_profiles.csv
-        with open(USER_PROFILES_CSV, mode='a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                payload.get("name", "Unknown"),
-                ", ".join(payload.get("intolerances", [])),
-                ", ".join(payload.get("diet", [])),
-                ", ".join(payload.get("increase_goals", [])),
-                ", ".join(payload.get("decrease_goals", [])),
-                ", ".join(payload.get("liked_flavors", []) or payload.get("flavors", [])),
-                ", ".join(payload.get("disliked_flavors", [])),
-                ", ".join(payload.get("liked_textures", []) or payload.get("texture", [])),
-                ", ".join(payload.get("disliked_textures", [])),
-                ", ".join(payload.get("preferred_foods", [])),
-                ", ".join(payload.get("disliked_foods", [])),
-                ", ".join(payload.get("liked_recipe_ingredients", [])),
-                ", ".join(payload.get("disliked_recipe_ingredients", [])),
-                ", ".join(payload.get("liked_recipe_flavors", [])),
-                ", ".join(payload.get("disliked_recipe_flavors", [])),
-                ", ".join(payload.get("liked_recipe_textures", [])),
-                ", ".join(payload.get("disliked_recipe_textures", []))
-            ])
-            
-        return {"status": "success", "message": "Preferences saved to server"}
-    except Exception as e:
-        print(f"ERROR in save_preferences: {str(e)}")
-        return {"error": str(e)}
+
+# ─── Entrypoint ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn
-    # More reliable way to get local IP on Mac/Linux
+
     def get_ip():
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            # doesn't even have to be reachable
             s.connect(('10.255.255.255', 1))
             IP = s.getsockname()[0]
         except Exception:
@@ -266,12 +377,11 @@ if __name__ == "__main__":
         finally:
             s.close()
         return IP
-    
+
     local_ip = get_ip()
-    print("\n" + "!"*60)
+    print("\n" + "!" * 60)
     print(f"!!! BACKEND IS RUNNING !!!")
     print(f"!!! YOUR MAC IP IS: {local_ip}")
     print(f"!!! YOUR API_URL SHOULD BE: http://{local_ip}:3001")
-    print(f"!!! Try opening http://{local_ip}:3001 on your PHONE browser")
-    print("!"*60 + "\n")
+    print("!" * 60 + "\n")
     uvicorn.run(app, host="0.0.0.0", port=3001)

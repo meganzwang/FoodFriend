@@ -1,3 +1,4 @@
+// src/screens/PreferencesScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
@@ -24,10 +25,10 @@ import {
 } from "../../types";
 import { CONFIG } from "../config";
 
-// Assuming we moved the JSON here or import it directly
 import ingredientData from "../ingredients.json";
 
 const STORAGE_KEY = "@user_preferences";
+const USER_ID_KEY = "@food_friend_user_id";
 
 type PreferencesScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -103,6 +104,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
     disliked_recipe_textures: [],
     cuisines: [],
   });
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [preferredSearch, setPreferredSearch] = useState("");
   const [dislikeSearch, setDislikeSearch] = useState("");
@@ -114,7 +116,13 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
 
   const loadPreferences = async () => {
     try {
-      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      const [saved, storedId] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEY),
+        AsyncStorage.getItem(USER_ID_KEY),
+      ]);
+
+      if (storedId) setUserId(storedId);
+
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed) {
@@ -153,10 +161,11 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
   const savePreferences = async (isContinue: boolean = false) => {
     setIsSaving(true);
     try {
-      // 1. Save locally first (Always succeeds immediately)
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
+      // Always save locally first
+      const prefsToStore = { ...preferences, user_id: userId };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(prefsToStore));
 
-      // 2. Try to save to backend with a timeout
+      // Sync to backend
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(
@@ -164,8 +173,14 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           CONFIG.TIMEOUT_MS,
         );
 
-        const response = await fetch(`${CONFIG.API_URL}/api/save-preferences`, {
-          method: "POST",
+        // Use the user-specific PUT endpoint when we have an ID
+        const url = userId
+          ? `${CONFIG.API_URL}/api/users/${userId}/preferences`
+          : `${CONFIG.API_URL}/api/save-preferences`;
+        const method = userId ? "PUT" : "POST";
+
+        const response = await fetch(url, {
+          method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(preferences),
           signal: controller.signal,
@@ -178,14 +193,14 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
         }
       } catch (backendError) {
         console.warn(
-          "Could not reach backend (timeout or network), preferences saved locally only",
+          "Could not reach backend — preferences saved locally only",
         );
       }
 
       if (isContinue) {
         navigation.navigate("IngredientRank");
       } else {
-        Alert.alert("Success", "Preferences saved successfully!");
+        Alert.alert("Saved!", "Your preferences have been updated.");
       }
     } catch (e) {
       Alert.alert("Error", "Failed to save preferences.");
@@ -244,6 +259,14 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           Help us personalize your food recommendations
         </Text>
 
+        {/* Show the user's ID as a subtle reminder */}
+        {userId && (
+          <View style={styles.idBadge}>
+            <Text style={styles.idBadgeLabel}>Your ID</Text>
+            <Text style={styles.idBadgeValue}>{userId}</Text>
+          </View>
+        )}
+
         <SectionHeader
           title="Your Name"
           subtitle="How should we address you?"
@@ -300,7 +323,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
             onToggle={(val) => toggleSelection("disliked_flavors", val)}
             activeColor="#D32F2F"
           />
-
           <Text style={[styles.aversionLabel, { marginTop: 12 }]}>
             Textures to limit:
           </Text>
@@ -456,7 +478,32 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: "#666",
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  idBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E9",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 16,
+    alignSelf: "flex-start",
+    gap: 8,
+  },
+  idBadgeLabel: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  idBadgeValue: {
+    fontSize: 14,
+    fontFamily: "monospace",
+    fontWeight: "700",
+    color: "#2E7D32",
+    letterSpacing: 2,
   },
   sectionHeader: {
     marginTop: 20,

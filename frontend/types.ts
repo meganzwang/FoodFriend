@@ -1,6 +1,7 @@
 // FoodFriend/types.ts
 
 export type RootStackParamList = {
+  Login: undefined;
   Welcome: undefined;
   EHRLogin: undefined;
   Goals: undefined;
