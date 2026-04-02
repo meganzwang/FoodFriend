@@ -11,8 +11,13 @@ import RecommendationsScreen from "./src/screens/RecommendationsScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import PreferencesScreen from "./src/screens/PreferencesScreen";
 import IngredientRankScreen from "./src/screens/IngredientRankScreen";
+import GroceryListScreen from "./src/screens/GroceryListScreen";
+import AllTriedRecipesScreen from "./src/screens/AllTriedRecipesScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { MainTabParamList, RootStackParamList } from "./types";
+
+const RecipeFeedbackScreen =
+  require("./src/screens/RecipeFeedbackScreen").default;
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -24,12 +29,12 @@ function MainAppTabs() {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === "Recommendations") {
+          if (route.name === "ThisWeekRecipes") {
             iconName = focused ? "nutrition" : "nutrition-outline";
-          } else if (route.name === "Goals") {
-            iconName = focused ? "flag" : "flag-outline";
-          } else if (route.name === "Preferences") {
-            iconName = focused ? "options" : "options-outline";
+          } else if (route.name === "ThisWeekGroceries") {
+            iconName = focused ? "basket" : "basket-outline";
+          } else if (route.name === "AllTriedRecipes") {
+            iconName = focused ? "library" : "library-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
           } else {
@@ -43,9 +48,21 @@ function MainAppTabs() {
         headerShown: false, // Hide header for tab screens, managed by stack
       })}
     >
-      <Tab.Screen name="Goals" component={GoalsScreen} />
-      <Tab.Screen name="Preferences" component={PreferencesScreen} />
-      <Tab.Screen name="Recommendations" component={RecommendationsScreen} />
+      <Tab.Screen
+        name="ThisWeekRecipes"
+        component={RecipeFeedbackScreen}
+        options={{ title: "This Week's Recipes" }}
+      />
+      <Tab.Screen
+        name="ThisWeekGroceries"
+        component={GroceryListScreen}
+        options={{ title: "This Week's Groceries" }}
+      />
+      <Tab.Screen
+        name="AllTriedRecipes"
+        component={AllTriedRecipesScreen}
+        options={{ title: "All Tried Recipes" }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -84,6 +101,16 @@ export default function App() {
           name="IngredientRank"
           component={IngredientRankScreen}
           options={{ title: "Rankings" }}
+        />
+        <Stack.Screen
+          name="RecipeFeedback"
+          component={RecipeFeedbackScreen}
+          options={{ title: "Recipe Feedback" }}
+        />
+        <Stack.Screen
+          name="RecipePicker"
+          component={RecommendationsScreen}
+          options={{ title: "Pick Recipes" }}
         />
         {/* After onboarding, the user enters the main app with tabs */}
         <Stack.Screen

@@ -103,6 +103,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
     liked_recipe_textures: [],
     disliked_recipe_textures: [],
     cuisines: [],
+    tried_recipe_ids: [],
   });
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -148,6 +149,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
             liked_recipe_textures: parsed.liked_recipe_textures || [],
             disliked_recipe_textures: parsed.disliked_recipe_textures || [],
             cuisines: parsed.cuisines || [],
+            tried_recipe_ids: parsed.tried_recipe_ids || [],
           });
         }
       }

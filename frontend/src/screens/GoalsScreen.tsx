@@ -83,6 +83,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
     liked_recipe_textures: [],
     disliked_recipe_textures: [],
     cuisines: [],
+    tried_recipe_ids: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -115,6 +116,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
             liked_recipe_textures: parsed.liked_recipe_textures || [],
             disliked_recipe_textures: parsed.disliked_recipe_textures || [],
             cuisines: parsed.cuisines || [],
+            tried_recipe_ids: parsed.tried_recipe_ids || [],
           });
         }
       }

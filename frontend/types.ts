@@ -10,14 +10,25 @@ export type RootStackParamList = {
   MainApp: NavigatorScreenParams<MainTabParamList> | undefined;
   Preferences: undefined;
   IngredientRank: undefined;
+  RecipeFeedback: { selectedRecipes?: Recipe[] } | undefined;
+  RecipePicker: undefined;
 };
 
 export type MainTabParamList = {
-  Recommendations: undefined;
-  Goals: undefined;
-  Preferences: undefined;
+  ThisWeekRecipes: { selectedRecipes?: Recipe[] } | undefined;
+  ThisWeekGroceries: undefined;
+  AllTriedRecipes: undefined;
   Profile: undefined;
 };
+
+export interface TriedRecipe {
+  id: number;
+  title: string;
+  image: string;
+  sourceUrl: string;
+  feedbackType: "liked" | "disliked";
+  triedAt: string;
+}
 
 // Define enums for specific choices to ensure consistency and prevent typos
 export enum DietaryRestriction {
@@ -190,6 +201,8 @@ export interface UserPreferences {
   liked_recipe_textures: string[];
   disliked_recipe_textures: string[];
   cuisines: string[];
+  tried_recipe_ids?: number[];
+  tried_recipes?: TriedRecipe[];
 
   // Legacy fields (optional for backward compatibility)
   flavors?: string[];
