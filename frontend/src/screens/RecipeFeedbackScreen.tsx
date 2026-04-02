@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,14 +10,24 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Recipe, RootStackParamList, UserPreferences } from "../../types";
+import {
+  MainTabParamList,
+  Recipe,
+  RootStackParamList,
+  TriedRecipe,
+  UserPreferences,
+} from "../../types";
 import RecipeFeedbackModal from "../components/RecipeFeedbackModal";
 import { CONFIG } from "../config";
+import { CompositeNavigationProp } from "@react-navigation/native";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 
-type RecipeFeedbackRouteProp = RouteProp<RootStackParamList, "RecipeFeedback">;
-type RecipeFeedbackNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "RecipeFeedback"
+type RecipeFeedbackRouteProp =
+  | RouteProp<RootStackParamList, "RecipeFeedback">
+  | RouteProp<MainTabParamList, "ThisWeekRecipes">;
+type RecipeFeedbackNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, "ThisWeekRecipes">,
+  NativeStackNavigationProp<RootStackParamList>
 >;
 
 interface RecipeFeedbackScreenProps {
@@ -36,6 +46,7 @@ interface RecipeFeedbackEntry {
 
 const STORAGE_KEY = "@user_preferences";
 const USER_ID_KEY = "@food_friend_user_id";
+const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
 
 const mergeUnique = (existing: string[] = [], incoming: string[] = []) =>
   Array.from(new Set([...(existing || []), ...(incoming || [])]));
@@ -44,7 +55,9 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
   route,
   navigation,
 }) => {
-  const selectedRecipes = route.params?.selectedRecipes || [];
+  const routedRecipes = route.params?.selectedRecipes || [];
+  const [selectedRecipes, setSelectedRecipes] =
+    useState<Recipe[]>(routedRecipes);
 
   const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
   const [activeType, setActiveType] = useState<FeedbackType>("liked");
@@ -52,6 +65,30 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
     Record<number, RecipeFeedbackEntry>
   >({});
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const loadSelectedRecipes = async () => {
+      if (routedRecipes.length > 0) {
+        setSelectedRecipes(routedRecipes);
+        await AsyncStorage.setItem(
+          WEEKLY_SELECTED_RECIPES_KEY,
+          JSON.stringify(routedRecipes),
+        );
+        return;
+      }
+
+      const stored = await AsyncStorage.getItem(WEEKLY_SELECTED_RECIPES_KEY);
+      if (stored) {
+        try {
+          setSelectedRecipes(JSON.parse(stored));
+        } catch (error) {
+          console.warn("Failed to parse weekly selected recipes");
+        }
+      }
+    };
+
+    void loadSelectedRecipes();
+  }, [routedRecipes]);
 
   const completedCount = useMemo(
     () =>
@@ -138,6 +175,23 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         .map((recipe) => recipe.id)
         .filter((id): id is number => typeof id === "number");
 
+      const triedRecipes: TriedRecipe[] = selectedRecipes
+        .filter((recipe) => recipe?.id != null && feedbackByRecipe[recipe.id])
+        .map((recipe) => ({
+          id: recipe.id,
+          title: recipe.title,
+          image: recipe.image,
+          sourceUrl: recipe.sourceUrl,
+          feedbackType: feedbackByRecipe[recipe.id].type,
+          triedAt: new Date().toISOString(),
+        }));
+
+      const existingTried = saved.tried_recipes || [];
+      const triedRecipeMap = new Map<number, TriedRecipe>();
+      [...existingTried, ...triedRecipes].forEach((recipe) => {
+        triedRecipeMap.set(recipe.id, recipe);
+      });
+
       const updatedPrefs: UserPreferences = {
         intolerances: saved.intolerances || [],
         diet: saved.diet || [],
@@ -178,6 +232,9 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         tried_recipe_ids: Array.from(
           new Set([...(saved.tried_recipe_ids || []), ...triedRecipeIds]),
         ),
+        tried_recipes: Array.from(triedRecipeMap.values()).sort((a, b) =>
+          b.triedAt.localeCompare(a.triedAt),
+        ),
       };
 
       await AsyncStorage.setItem(
@@ -213,17 +270,7 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         console.warn("Could not reach backend, feedback saved locally");
       }
 
-      Alert.alert(
-        "Saved",
-        "Feedback recorded. Future recipes will avoid repeats.",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              navigation.navigate("MainApp", { screen: "Recommendations" }),
-          },
-        ],
-      );
+      navigation.navigate("RecipePicker");
     } catch (error) {
       Alert.alert("Error", "Failed to save recipe feedback.");
     } finally {
@@ -290,7 +337,7 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         disabled={isSaving}
       >
         <Text style={styles.submitButtonText}>
-          {isSaving ? "Saving..." : "Save Feedback"}
+          {isSaving ? "Saving..." : "Save Feedback & Generate More Recipes"}
         </Text>
       </TouchableOpacity>
 

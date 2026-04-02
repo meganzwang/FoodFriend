@@ -181,9 +181,7 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
 
         <TouchableOpacity
           style={styles.continueButton}
-          onPress={() =>
-            navigation.navigate("MainApp", { screen: "Recommendations" })
-          }
+          onPress={() => navigation.navigate("RecipePicker")}
         >
           <Text style={styles.continueButtonText}>Proceed to Recipes</Text>
         </TouchableOpacity>

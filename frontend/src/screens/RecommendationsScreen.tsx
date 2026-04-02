@@ -12,20 +12,18 @@ import {
   TouchableOpacity,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MainTabParamList, Recipe, UserPreferences } from "../../types";
-import { CompositeNavigationProp } from "@react-navigation/native";
-import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { Recipe, RootStackParamList, UserPreferences } from "../../types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../../types";
 import { CONFIG } from "../config";
 
 const STORAGE_KEY = "@user_preferences";
+const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
 const PAGE_SIZE = 5;
 const MAX_VISIBLE_RECIPES = 20;
 
-type RecommendationsScreenNavigationProp = CompositeNavigationProp<
-  BottomTabNavigationProp<MainTabParamList, "Recommendations">,
-  NativeStackNavigationProp<RootStackParamList>
+type RecommendationsScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "RecipePicker"
 >;
 
 interface RecommendationsScreenProps {
@@ -87,7 +85,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     );
   };
 
-  const handleContinueToFeedback = () => {
+  const handleContinueToFeedback = async () => {
     if (selectedRecipeIds.length === 0) {
       Alert.alert(
         "Select Recipes",
@@ -99,7 +97,14 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     const selectedRecipes = recommendations.filter((recipe) =>
       selectedRecipeIds.includes(recipe.id),
     );
-    navigation.navigate("RecipeFeedback", { selectedRecipes });
+    await AsyncStorage.setItem(
+      WEEKLY_SELECTED_RECIPES_KEY,
+      JSON.stringify(selectedRecipes),
+    );
+    navigation.navigate("MainApp", {
+      screen: "ThisWeekRecipes",
+      params: { selectedRecipes },
+    });
   };
 
   const maxLoadedRecipes = Math.min(
@@ -146,15 +151,6 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
         />
       ) : (
         <ScrollView contentContainerStyle={styles.recommendationsList}>
-          <TouchableOpacity
-            style={styles.generateMoreButton}
-            onPress={fetchRecommendations}
-          >
-            <Text style={styles.generateMoreButtonText}>
-              Generate More Ingredients
-            </Text>
-          </TouchableOpacity>
-
           {recommendedIngredients.length > 0 && (
             <View style={styles.ingredientsCard}>
               <Text style={styles.ingredientsTitle}>
@@ -167,10 +163,18 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
           )}
 
           {recommendations.length === 0 ? (
-            <Text style={styles.emptyText}>
-              No recipes found for your current preferences. Try adjusting your
-              goals or flavor settings and refresh.
-            </Text>
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyText}>
+                No recipes found right now. Please update your goals and
+                preferences, then try generating recipes again.
+              </Text>
+              <TouchableOpacity
+                style={styles.adjustGoalsButton}
+                onPress={() => navigation.navigate("Goals")}
+              >
+                <Text style={styles.adjustGoalsButtonText}>Go to Goals</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             visibleRecipes.map((recipe) => (
               <View key={recipe.id} style={styles.recipeCard}>
@@ -234,7 +238,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
           {recommendations.length > 0 && (
             <TouchableOpacity
               style={styles.continueButton}
-              onPress={handleContinueToFeedback}
+              onPress={() => void handleContinueToFeedback()}
             >
               <Text style={styles.continueButtonText}>
                 Continue to Feedback ({selectedRecipeIds.length} selected)
@@ -300,8 +304,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    marginTop: 40,
     paddingHorizontal: 20,
+  },
+  emptyStateContainer: {
+    width: "100%",
+    maxWidth: 400,
+    marginTop: 40,
+    alignItems: "center",
+    gap: 14,
+  },
+  adjustGoalsButton: {
+    backgroundColor: "#1976D2",
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  adjustGoalsButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
   },
   recipeLink: {
     marginVertical: 12,
@@ -315,20 +337,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
-  },
-  generateMoreButton: {
-    width: "100%",
-    maxWidth: 400,
-    backgroundColor: "#4CAF50",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  generateMoreButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
   },
   ingredientsCard: {
     width: "100%",
