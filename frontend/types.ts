@@ -1,17 +1,21 @@
 // FoodFriend/types.ts
 
+import { NavigatorScreenParams } from "@react-navigation/native";
+
 export type RootStackParamList = {
   Login: undefined;
   Welcome: undefined;
   EHRLogin: undefined;
   Goals: undefined;
-  MainApp: undefined;
+  MainApp: NavigatorScreenParams<MainTabParamList> | undefined;
   Preferences: undefined;
   IngredientRank: undefined;
 };
 
 export type MainTabParamList = {
   Recommendations: undefined;
+  Goals: undefined;
+  Preferences: undefined;
   Profile: undefined;
 };
 

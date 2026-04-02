@@ -133,7 +133,7 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
         <View style={styles.listContainer}>
           {rankedIngredients.length > 0 ? (
             rankedIngredients.map((item, index) => (
-              <View key={item.name} style={styles.rankItem}>
+              <View key={`${item.name}-${index}`} style={styles.rankItem}>
                 <View style={styles.rankBadge}>
                   <Text style={styles.rankNumber}>{index + 1}</Text>
                 </View>
@@ -160,9 +160,9 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
               </Text>
             </View>
             <View style={styles.listContainer}>
-              {filteredOut.map((item) => (
+              {filteredOut.map((item, index) => (
                 <View
-                  key={item.name}
+                  key={`${item.name}-${item.reason || "filtered"}-${index}`}
                   style={[styles.rankItem, styles.filteredItem]}
                 >
                   <View style={styles.infoContainer}>
@@ -181,7 +181,9 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
 
         <TouchableOpacity
           style={styles.continueButton}
-          onPress={() => navigation.navigate("MainApp")}
+          onPress={() =>
+            navigation.navigate("MainApp", { screen: "Recommendations" })
+          }
         >
           <Text style={styles.continueButtonText}>Proceed to Recipes</Text>
         </TouchableOpacity>
