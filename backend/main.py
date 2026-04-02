@@ -316,6 +316,11 @@ async def recommend_recipes(request: Request):
             return {"error": "SPOONACULAR_API_KEY is missing in backend environment."}
 
         normalized_profile = normalize_profile_for_model(user_profile)
+        tried_recipe_ids = {
+            str(recipe_id)
+            for recipe_id in (user_profile.get("tried_recipe_ids") or [])
+            if recipe_id is not None
+        }
         top_ranked = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS)
         filtered = []
         top_ingredient_names = [item.get('name') for item in top_ranked if item.get('name')]
@@ -324,10 +329,14 @@ async def recommend_recipes(request: Request):
             return {"top_ingredients": [], "ranked": top_ranked, "filtered": filtered, "recipes": []}
 
         spoon = SpoonacularClient(api_key=api_key)
-        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=20)
+        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=60)
 
         recipes = []
         for recipe in spoon_recipes:
+            recipe_id = recipe.get("id")
+            if recipe_id is not None and str(recipe_id) in tried_recipe_ids:
+                continue
+
             nutrients = recipe.get('nutrition', {}).get('nutrients', [])
             calories = next(
                 (n.get('amount') for n in nutrients if str(n.get('name', '')).lower() == 'calories'),
@@ -339,7 +348,7 @@ async def recommend_recipes(request: Request):
                 if ing.get('name', '').strip()
             ]
             recipes.append({
-                "id": recipe.get("id"),
+                "id": recipe_id,
                 "title": recipe.get("title", "Untitled Recipe"),
                 "image": recipe.get("image", ""),
                 "sourceUrl": recipe.get("sourceUrl", ""),
@@ -349,6 +358,9 @@ async def recommend_recipes(request: Request):
                 "summary": recipe.get("summary", ""),
                 "ingredients": ingredients,
             })
+
+            if len(recipes) >= 20:
+                break
 
         return {
             "top_ingredients": top_ingredient_names,

@@ -10,6 +10,7 @@ export type RootStackParamList = {
   MainApp: NavigatorScreenParams<MainTabParamList> | undefined;
   Preferences: undefined;
   IngredientRank: undefined;
+  RecipeFeedback: { selectedRecipes: Recipe[] };
 };
 
 export type MainTabParamList = {
@@ -190,6 +191,7 @@ export interface UserPreferences {
   liked_recipe_textures: string[];
   disliked_recipe_textures: string[];
   cuisines: string[];
+  tried_recipe_ids?: number[];
 
   // Legacy fields (optional for backward compatibility)
   flavors?: string[];

@@ -1,5 +1,5 @@
 // FoodFriend/src/screens/RecommendationsScreen.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
-  Button,
   Alert,
   Linking,
   TouchableOpacity,
@@ -19,9 +18,10 @@ import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types";
 import { CONFIG } from "../config";
-import RecipeFeedbackModal from "../components/RecipeFeedbackModal";
 
 const STORAGE_KEY = "@user_preferences";
+const PAGE_SIZE = 5;
+const MAX_VISIBLE_RECIPES = 20;
 
 type RecommendationsScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, "Recommendations">,
@@ -40,19 +40,14 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     string[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
-  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
-  const [feedbackType, setFeedbackType] = useState<"liked" | "disliked">(
-    "liked",
-  );
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<number[]>([]);
 
   const fetchRecommendations = async () => {
     setIsLoading(true);
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
-      const prefs = saved ? JSON.parse(saved) : {};
-      setPreferences(prefs);
+      const prefs: UserPreferences = saved ? JSON.parse(saved) : {};
 
       const response = await fetch(`${CONFIG.API_URL}/api/recommend-recipes`, {
         method: "POST",
@@ -70,6 +65,8 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
 
       setRecommendedIngredients(data.top_ingredients || []);
       setRecommendations(data.recipes || []);
+      setVisibleCount(PAGE_SIZE);
+      setSelectedRecipeIds([]);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
       Alert.alert("Error", "Could not fetch recommendations.");
@@ -82,128 +79,42 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     fetchRecommendations();
   }, []);
 
-  const handleOpenFeedbackModal = (
-    recipe: Recipe,
-    type: "liked" | "disliked",
-  ) => {
-    setSelectedRecipe(recipe);
-    setFeedbackType(type);
-    setFeedbackModalVisible(true);
+  const toggleRecipeSelection = (recipeId: number) => {
+    setSelectedRecipeIds((prev) =>
+      prev.includes(recipeId)
+        ? prev.filter((id) => id !== recipeId)
+        : [...prev, recipeId],
+    );
   };
 
-  const mergeUnique = (existing: string[] = [], incoming: string[] = []) =>
-    Array.from(new Set([...(existing || []), ...(incoming || [])]));
-
-  const handleFeedbackSubmit = async (feedback: {
-    ingredients: string[];
-    flavors: string[];
-    textures: string[];
-  }) => {
-    if (!preferences || !selectedRecipe) return;
-
-    const latestSavedRaw = await AsyncStorage.getItem(STORAGE_KEY);
-    const latestSaved = latestSavedRaw
-      ? (JSON.parse(latestSavedRaw) as Partial<UserPreferences>)
-      : {};
-
-    const basePreferences: UserPreferences = {
-      ...preferences,
-      ...latestSaved,
-      liked_recipe_ingredients: latestSaved.liked_recipe_ingredients || [],
-      disliked_recipe_ingredients:
-        latestSaved.disliked_recipe_ingredients || [],
-      liked_recipe_flavors: latestSaved.liked_recipe_flavors || [],
-      disliked_recipe_flavors: latestSaved.disliked_recipe_flavors || [],
-      liked_recipe_textures: latestSaved.liked_recipe_textures || [],
-      disliked_recipe_textures: latestSaved.disliked_recipe_textures || [],
-      liked_flavors: latestSaved.liked_flavors || [],
-      disliked_flavors: latestSaved.disliked_flavors || [],
-      liked_textures: latestSaved.liked_textures || [],
-      disliked_textures: latestSaved.disliked_textures || [],
-      preferred_foods: latestSaved.preferred_foods || [],
-      disliked_foods: latestSaved.disliked_foods || [],
-      intolerances: latestSaved.intolerances || [],
-      diet: latestSaved.diet || [],
-      increase_goals: latestSaved.increase_goals || [],
-      decrease_goals: latestSaved.decrease_goals || [],
-      cuisines: latestSaved.cuisines || [],
-    };
-
-    const updatedPrefs: UserPreferences = {
-      ...basePreferences,
-      liked_recipe_ingredients:
-        feedbackType === "liked"
-          ? mergeUnique(
-              basePreferences.liked_recipe_ingredients,
-              feedback.ingredients,
-            )
-          : basePreferences.liked_recipe_ingredients || [],
-      disliked_recipe_ingredients:
-        feedbackType === "disliked"
-          ? mergeUnique(
-              basePreferences.disliked_recipe_ingredients,
-              feedback.ingredients,
-            )
-          : basePreferences.disliked_recipe_ingredients || [],
-      liked_recipe_flavors:
-        feedbackType === "liked"
-          ? mergeUnique(basePreferences.liked_recipe_flavors, feedback.flavors)
-          : basePreferences.liked_recipe_flavors || [],
-      disliked_recipe_flavors:
-        feedbackType === "disliked"
-          ? mergeUnique(
-              basePreferences.disliked_recipe_flavors,
-              feedback.flavors,
-            )
-          : basePreferences.disliked_recipe_flavors || [],
-      liked_recipe_textures:
-        feedbackType === "liked"
-          ? mergeUnique(
-              basePreferences.liked_recipe_textures,
-              feedback.textures,
-            )
-          : basePreferences.liked_recipe_textures || [],
-      disliked_recipe_textures:
-        feedbackType === "disliked"
-          ? mergeUnique(
-              basePreferences.disliked_recipe_textures,
-              feedback.textures,
-            )
-          : basePreferences.disliked_recipe_textures || [],
-    };
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPrefs));
-
-      // Try to save to backend
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          CONFIG.TIMEOUT_MS,
-        );
-
-        await fetch(`${CONFIG.API_URL}/api/save-preferences`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updatedPrefs),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-      } catch (error) {
-        console.warn("Could not reach backend, feedback saved locally");
-      }
-
-      setPreferences(updatedPrefs);
-      setFeedbackModalVisible(false);
+  const handleContinueToFeedback = () => {
+    if (selectedRecipeIds.length === 0) {
       Alert.alert(
-        "Thanks!",
-        "Your feedback has been saved and will help personalize your recommendations.",
+        "Select Recipes",
+        "Choose at least one recipe to continue to feedback.",
       );
-    } catch (error) {
-      Alert.alert("Error", "Failed to save feedback.");
+      return;
     }
+
+    const selectedRecipes = recommendations.filter((recipe) =>
+      selectedRecipeIds.includes(recipe.id),
+    );
+    navigation.navigate("RecipeFeedback", { selectedRecipes });
+  };
+
+  const maxLoadedRecipes = Math.min(
+    recommendations.length,
+    MAX_VISIBLE_RECIPES,
+  );
+  const visibleRecipes = useMemo(
+    () => recommendations.slice(0, Math.min(visibleCount, maxLoadedRecipes)),
+    [recommendations, visibleCount, maxLoadedRecipes],
+  );
+
+  const canLoadMore = visibleCount < maxLoadedRecipes;
+
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, maxLoadedRecipes));
   };
 
   const handleOpenRecipe = async (sourceUrl: string) => {
@@ -261,7 +172,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
               goals or flavor settings and refresh.
             </Text>
           ) : (
-            recommendations.map((recipe) => (
+            visibleRecipes.map((recipe) => (
               <View key={recipe.id} style={styles.recipeCard}>
                 <Image
                   source={{ uri: recipe.image }}
@@ -287,32 +198,51 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
                     <Text style={styles.recipeLinkText}>View Recipe →</Text>
                   </TouchableOpacity>
                 )}
-                <View style={styles.buttonRow}>
-                  <Button title="Didn't Try" onPress={() => {}} color="#999" />
-                  <Button
-                    title="👍 Liked"
-                    onPress={() => handleOpenFeedbackModal(recipe, "liked")}
-                    color="green"
-                  />
-                  <Button
-                    title="👎 Disliked"
-                    onPress={() => handleOpenFeedbackModal(recipe, "disliked")}
-                    color="red"
-                  />
-                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.selectButton,
+                    selectedRecipeIds.includes(recipe.id) &&
+                      styles.selectButtonActive,
+                  ]}
+                  onPress={() => toggleRecipeSelection(recipe.id)}
+                >
+                  <Text
+                    style={[
+                      styles.selectButtonText,
+                      selectedRecipeIds.includes(recipe.id) &&
+                        styles.selectButtonTextActive,
+                    ]}
+                  >
+                    {selectedRecipeIds.includes(recipe.id)
+                      ? "Selected"
+                      : "Select for This Week"}
+                  </Text>
+                </TouchableOpacity>
               </View>
             ))
           )}
+
+          {canLoadMore && (
+            <TouchableOpacity
+              style={styles.loadMoreButton}
+              onPress={handleLoadMore}
+            >
+              <Text style={styles.loadMoreButtonText}>Add More Recipes</Text>
+            </TouchableOpacity>
+          )}
+
+          {recommendations.length > 0 && (
+            <TouchableOpacity
+              style={styles.continueButton}
+              onPress={handleContinueToFeedback}
+            >
+              <Text style={styles.continueButtonText}>
+                Continue to Feedback ({selectedRecipeIds.length} selected)
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
-
-      <RecipeFeedbackModal
-        visible={feedbackModalVisible}
-        recipe={selectedRecipe}
-        feedbackType={feedbackType}
-        onClose={() => setFeedbackModalVisible(false)}
-        onSubmit={handleFeedbackSubmit}
-      />
     </View>
   );
 };
@@ -373,11 +303,6 @@ const styles = StyleSheet.create({
     marginTop: 40,
     paddingHorizontal: 20,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 10,
-  },
   recipeLink: {
     marginVertical: 12,
     paddingVertical: 10,
@@ -425,6 +350,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#555",
     lineHeight: 20,
+  },
+  selectButton: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  selectButtonActive: {
+    backgroundColor: "#E8F5E9",
+  },
+  selectButtonText: {
+    color: "#2E7D32",
+    fontWeight: "700",
+  },
+  selectButtonTextActive: {
+    color: "#1B5E20",
+  },
+  loadMoreButton: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#1976D2",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  loadMoreButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  continueButton: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "#2E7D32",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  continueButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
 

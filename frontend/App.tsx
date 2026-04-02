@@ -14,6 +14,9 @@ import IngredientRankScreen from "./src/screens/IngredientRankScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { MainTabParamList, RootStackParamList } from "./types";
 
+const RecipeFeedbackScreen =
+  require("./src/screens/RecipeFeedbackScreen").default;
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -84,6 +87,11 @@ export default function App() {
           name="IngredientRank"
           component={IngredientRankScreen}
           options={{ title: "Rankings" }}
+        />
+        <Stack.Screen
+          name="RecipeFeedback"
+          component={RecipeFeedbackScreen}
+          options={{ title: "Recipe Feedback" }}
         />
         {/* After onboarding, the user enters the main app with tabs */}
         <Stack.Screen

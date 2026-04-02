@@ -96,9 +96,9 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Ingredients</Text>
               <View style={styles.chipContainer}>
-                {recipeIngredients.map((ingredient) => (
+                {recipeIngredients.map((ingredient, index) => (
                   <TouchableOpacity
-                    key={ingredient}
+                    key={`${ingredient}-${index}`}
                     style={[
                       styles.chip,
                       selectedIngredients.includes(ingredient) && {
