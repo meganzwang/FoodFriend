@@ -12,10 +12,10 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import PreferencesScreen from "./src/screens/PreferencesScreen";
 import IngredientRankScreen from "./src/screens/IngredientRankScreen";
 import { Ionicons } from "@expo/vector-icons";
-import { RootStackParamList } from "./types";
+import { MainTabParamList, RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Main tab navigator for screens accessible after onboarding/login
 function MainAppTabs() {
@@ -26,8 +26,14 @@ function MainAppTabs() {
           let iconName;
           if (route.name === "Recommendations") {
             iconName = focused ? "nutrition" : "nutrition-outline";
+          } else if (route.name === "Goals") {
+            iconName = focused ? "flag" : "flag-outline";
+          } else if (route.name === "Preferences") {
+            iconName = focused ? "options" : "options-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
+          } else {
+            iconName = "ellipse-outline";
           }
           // You can return any component that you like here!
           return <Ionicons name={iconName as any} size={size} color={color} />;
@@ -37,6 +43,8 @@ function MainAppTabs() {
         headerShown: false, // Hide header for tab screens, managed by stack
       })}
     >
+      <Tab.Screen name="Goals" component={GoalsScreen} />
+      <Tab.Screen name="Preferences" component={PreferencesScreen} />
       <Tab.Screen name="Recommendations" component={RecommendationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

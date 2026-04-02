@@ -150,6 +150,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
     }
   };
 
+  const handleSaveGoals = async () => {
+    try {
+      const userId = await AsyncStorage.getItem(USER_ID_KEY);
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...preferences, user_id: userId }),
+      );
+      Alert.alert("Saved!", "Your goals have been updated.");
+    } catch (e) {
+      Alert.alert("Error", "Failed to save goals.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -192,6 +205,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
           selected={preferences.decrease_goals}
           onToggle={(val) => toggleSelection("decrease_goals", val)}
         />
+
+        <TouchableOpacity style={styles.saveButton} onPress={handleSaveGoals}>
+          <Text style={styles.saveButtonText}>Save Goals</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.continueButton}
@@ -275,13 +292,30 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "500",
   },
-  continueButton: {
-    backgroundColor: "#4CAF50",
+  saveButton: {
+    backgroundColor: "#2E7D32",
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 40,
     alignItems: "center",
-    shadowColor: "#4CAF50",
+    shadowColor: "#2E7D32",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  continueButton: {
+    backgroundColor: "#1976D2",
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: "center",
+    shadowColor: "#1976D2",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
