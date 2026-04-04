@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -29,9 +29,19 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
   onClose,
   onSubmit,
 }) => {
+  type SectionKey = "ingredients" | "flavors" | "textures";
+  const defaultExpandedSections: Record<SectionKey, boolean> = {
+    ingredients: false,
+    flavors: false,
+    textures: false,
+  };
+
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
+  const [expandedSections, setExpandedSections] = useState<
+    Record<SectionKey, boolean>
+  >(defaultExpandedSections);
 
   const title =
     feedbackType === "liked"
@@ -69,7 +79,30 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
 
   const handleClose = () => {
     resetSelections();
+    setExpandedSections(defaultExpandedSections);
     onClose();
+  };
+
+  useEffect(() => {
+    if (visible) {
+      setExpandedSections(defaultExpandedSections);
+    }
+  }, [visible]);
+
+  const toggleSection = (section: SectionKey) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const formatSelectedSummary = (items: string[]) => {
+    const count = items.length;
+    if (count === 0) return "None selected";
+    if (count === 1) return `1 selected: ${items[0]}`;
+    if (count === 2) return `2 selected: ${items[0]} and ${items[1]}`;
+
+    return `${count} selected: ${items[0]}, ${items[1]}, and ${items[2]}`;
   };
 
   const recipeIngredients = useMemo(
@@ -89,112 +122,169 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.recipeName}>{recipe?.title}</Text>
+            <Text style={styles.helperText}>
+              Expand any section below if you want to share more. You can submit
+              without selecting additional feedback.
+            </Text>
           </View>
 
-          {/* Ingredients Section */}
-          {recipeIngredients.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Ingredients</Text>
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.dropdownHeader}
+              onPress={() => toggleSection("ingredients")}
+            >
+              <View style={styles.dropdownHeaderLeft}>
+                <Text style={styles.sectionTitle}>Ingredients</Text>
+                <Text style={styles.selectionSummary}>
+                  {formatSelectedSummary(selectedIngredients)}
+                </Text>
+              </View>
+              <Text style={styles.dropdownIndicator}>
+                {expandedSections.ingredients ? "Hide" : "Show"}
+              </Text>
+            </TouchableOpacity>
+            {expandedSections.ingredients && (
+              <>
+                {recipeIngredients.length > 0 ? (
+                  <View style={styles.chipContainer}>
+                    {recipeIngredients.map((ingredient, index) => (
+                      <TouchableOpacity
+                        key={`${ingredient}-${index}`}
+                        style={[
+                          styles.chip,
+                          selectedIngredients.includes(ingredient) && {
+                            backgroundColor: buttonColor,
+                            borderColor: buttonColor,
+                          },
+                        ]}
+                        onPress={() =>
+                          toggleSelection(
+                            ingredient,
+                            selectedIngredients,
+                            setSelectedIngredients,
+                          )
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            selectedIngredients.includes(ingredient) &&
+                              styles.chipTextSelected,
+                          ]}
+                        >
+                          {ingredient.charAt(0).toUpperCase() +
+                            ingredient.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.emptyText}>
+                    No ingredient details available for this dish.
+                  </Text>
+                )}
+              </>
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.dropdownHeader}
+              onPress={() => toggleSection("flavors")}
+            >
+              <View style={styles.dropdownHeaderLeft}>
+                <Text style={styles.sectionTitle}>Flavors</Text>
+                <Text style={styles.selectionSummary}>
+                  {formatSelectedSummary(selectedFlavors)}
+                </Text>
+              </View>
+              <Text style={styles.dropdownIndicator}>
+                {expandedSections.flavors ? "Hide" : "Show"}
+              </Text>
+            </TouchableOpacity>
+            {expandedSections.flavors && (
               <View style={styles.chipContainer}>
-                {recipeIngredients.map((ingredient, index) => (
+                {FLAVORS.map((flavor) => (
                   <TouchableOpacity
-                    key={`${ingredient}-${index}`}
+                    key={flavor}
                     style={[
                       styles.chip,
-                      selectedIngredients.includes(ingredient) && {
+                      selectedFlavors.includes(flavor) && {
                         backgroundColor: buttonColor,
                         borderColor: buttonColor,
                       },
                     ]}
                     onPress={() =>
                       toggleSelection(
-                        ingredient,
-                        selectedIngredients,
-                        setSelectedIngredients,
+                        flavor,
+                        selectedFlavors,
+                        setSelectedFlavors,
                       )
                     }
                   >
                     <Text
                       style={[
                         styles.chipText,
-                        selectedIngredients.includes(ingredient) &&
+                        selectedFlavors.includes(flavor) &&
                           styles.chipTextSelected,
                       ]}
                     >
-                      {ingredient.charAt(0).toUpperCase() + ingredient.slice(1)}
+                      {flavor}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-          )}
-
-          {/* Flavors Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Flavors</Text>
-            <View style={styles.chipContainer}>
-              {FLAVORS.map((flavor) => (
-                <TouchableOpacity
-                  key={flavor}
-                  style={[
-                    styles.chip,
-                    selectedFlavors.includes(flavor) && {
-                      backgroundColor: buttonColor,
-                      borderColor: buttonColor,
-                    },
-                  ]}
-                  onPress={() =>
-                    toggleSelection(flavor, selectedFlavors, setSelectedFlavors)
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      selectedFlavors.includes(flavor) &&
-                        styles.chipTextSelected,
-                    ]}
-                  >
-                    {flavor}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            )}
           </View>
 
-          {/* Textures Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Textures</Text>
-            <View style={styles.chipContainer}>
-              {TEXTURES.map((texture) => (
-                <TouchableOpacity
-                  key={texture}
-                  style={[
-                    styles.chip,
-                    selectedTextures.includes(texture) && {
-                      backgroundColor: buttonColor,
-                      borderColor: buttonColor,
-                    },
-                  ]}
-                  onPress={() =>
-                    toggleSelection(
-                      texture,
-                      selectedTextures,
-                      setSelectedTextures,
-                    )
-                  }
-                >
-                  <Text
+            <TouchableOpacity
+              style={styles.dropdownHeader}
+              onPress={() => toggleSection("textures")}
+            >
+              <View style={styles.dropdownHeaderLeft}>
+                <Text style={styles.sectionTitle}>Textures</Text>
+                <Text style={styles.selectionSummary}>
+                  {formatSelectedSummary(selectedTextures)}
+                </Text>
+              </View>
+              <Text style={styles.dropdownIndicator}>
+                {expandedSections.textures ? "Hide" : "Show"}
+              </Text>
+            </TouchableOpacity>
+            {expandedSections.textures && (
+              <View style={styles.chipContainer}>
+                {TEXTURES.map((texture) => (
+                  <TouchableOpacity
+                    key={texture}
                     style={[
-                      styles.chipText,
-                      selectedTextures.includes(texture) &&
-                        styles.chipTextSelected,
+                      styles.chip,
+                      selectedTextures.includes(texture) && {
+                        backgroundColor: buttonColor,
+                        borderColor: buttonColor,
+                      },
                     ]}
+                    onPress={() =>
+                      toggleSelection(
+                        texture,
+                        selectedTextures,
+                        setSelectedTextures,
+                      )
+                    }
                   >
-                    {texture}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        selectedTextures.includes(texture) &&
+                          styles.chipTextSelected,
+                      ]}
+                    >
+                      {texture}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -241,22 +331,51 @@ const styles = StyleSheet.create({
     color: "#666",
     fontStyle: "italic",
   },
+  helperText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: "#616161",
+    lineHeight: 18,
+  },
   section: {
     marginBottom: 24,
+  },
+  dropdownHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    paddingBottom: 8,
+    marginBottom: 12,
+  },
+  dropdownHeaderLeft: {
+    flex: 1,
+    paddingRight: 12,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    paddingBottom: 8,
+  },
+  selectionSummary: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#616161",
+  },
+  dropdownIndicator: {
+    color: "#1976D2",
+    fontSize: 13,
+    fontWeight: "600",
   },
   chipContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     marginHorizontal: -4,
+  },
+  emptyText: {
+    color: "#777",
+    fontSize: 13,
   },
   chip: {
     paddingHorizontal: 12,
