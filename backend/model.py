@@ -173,41 +173,49 @@ class FoodFriendModel:
             disliked_food_vector = np.asarray(disliked_food_vector, dtype=np.float64)
             user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_food_vector
 
-        # 4. Blend recipe feedback (ingredients, flavors, textures) into user vector
-        liked_recipe_ingredients = preferences.get("liked_recipe_ingredients", []) or []
-        disliked_recipe_ingredients = preferences.get("disliked_recipe_ingredients", []) or []
+        # 4. Blend recipe feedback (ingredients, flavors, textures) into user vector.
+        # If feedback_vector_sum exists, it is the source of truth to avoid double counting.
+        feedback_vector_sum = preferences.get("feedback_vector_sum")
+        if not feedback_vector_sum:
+            liked_recipe_ingredients = preferences.get("liked_recipe_ingredients", []) or []
+            disliked_recipe_ingredients = preferences.get("disliked_recipe_ingredients", []) or []
 
-        liked_recipe_ingredient_vector = self._get_average_food_vector(liked_recipe_ingredients)
-        if liked_recipe_ingredient_vector is not None:
-            liked_recipe_ingredient_vector = np.asarray(liked_recipe_ingredient_vector, dtype=np.float64)
-            user_vec += self.PREFERRED_FOOD_WEIGHT * liked_recipe_ingredient_vector
+            liked_recipe_ingredient_vector = self._get_average_food_vector(liked_recipe_ingredients)
+            if liked_recipe_ingredient_vector is not None:
+                liked_recipe_ingredient_vector = np.asarray(liked_recipe_ingredient_vector, dtype=np.float64)
+                user_vec += self.PREFERRED_FOOD_WEIGHT * liked_recipe_ingredient_vector
 
-        disliked_recipe_ingredient_vector = self._get_average_food_vector(disliked_recipe_ingredients)
-        if disliked_recipe_ingredient_vector is not None:
-            disliked_recipe_ingredient_vector = np.asarray(disliked_recipe_ingredient_vector, dtype=np.float64)
-            user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_recipe_ingredient_vector
+            disliked_recipe_ingredient_vector = self._get_average_food_vector(disliked_recipe_ingredients)
+            if disliked_recipe_ingredient_vector is not None:
+                disliked_recipe_ingredient_vector = np.asarray(disliked_recipe_ingredient_vector, dtype=np.float64)
+                user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_recipe_ingredient_vector
 
-        # Handle liked/disliked recipe flavors and textures
-        liked_recipe_flavors = preferences.get("liked_recipe_flavors", []) or []
-        disliked_recipe_flavors = preferences.get("disliked_recipe_flavors", []) or []
-        liked_recipe_textures = preferences.get("liked_recipe_textures", []) or []
-        disliked_recipe_textures = preferences.get("disliked_recipe_textures", []) or []
+            liked_recipe_flavors = preferences.get("liked_recipe_flavors", []) or []
+            disliked_recipe_flavors = preferences.get("disliked_recipe_flavors", []) or []
+            liked_recipe_textures = preferences.get("liked_recipe_textures", []) or []
+            disliked_recipe_textures = preferences.get("disliked_recipe_textures", []) or []
 
-        for flavor in liked_recipe_flavors:
-            if flavor in self.tag_cols:
-                user_vec[self.tag_cols.index(flavor)] += 0.5
+            for flavor in liked_recipe_flavors:
+                if flavor in self.tag_cols:
+                    user_vec[self.tag_cols.index(flavor)] += 0.5
 
-        for flavor in disliked_recipe_flavors:
-            if flavor in self.tag_cols:
-                user_vec[self.tag_cols.index(flavor)] -= 0.5
+            for flavor in disliked_recipe_flavors:
+                if flavor in self.tag_cols:
+                    user_vec[self.tag_cols.index(flavor)] -= 0.5
 
-        for texture in liked_recipe_textures:
-            if texture in self.tag_cols:
-                user_vec[self.tag_cols.index(texture)] += 0.5
+            for texture in liked_recipe_textures:
+                if texture in self.tag_cols:
+                    user_vec[self.tag_cols.index(texture)] += 0.5
 
-        for texture in disliked_recipe_textures:
-            if texture in self.tag_cols:
-                user_vec[self.tag_cols.index(texture)] -= 0.5
+            for texture in disliked_recipe_textures:
+                if texture in self.tag_cols:
+                    user_vec[self.tag_cols.index(texture)] -= 0.5
+
+        # 5. Apply accumulated feedback vector updates.
+        if feedback_vector_sum:
+            feedback_vec = np.asarray(feedback_vector_sum, dtype=np.float64)
+            # Apply feedback with 0.5 weight so accumulated explicit feedback moderately influences recommendations
+            user_vec += 0.5 * feedback_vec
 
         return user_vec
 
@@ -326,3 +334,63 @@ class FoodFriendModel:
 
         candidates['score'] = scores
         return candidates[['name', 'score']].sort_values(by='score', ascending=False).head(top_n).to_dict(orient='records')
+
+    def calculate_feedback_vector_update(self, feedback_data):
+        """
+        Given recipe feedback with explicit selections, calculate a weighted vector
+        adjustment to incrementally update user preferences.
+        
+        feedback_data should contain:
+        - feedback_type: "liked" or "disliked"
+        - recipe_ingredients: list of ingredient names from the recipe
+        - selected_ingredients: list of ingredients user explicitly selected
+        - selected_flavors: list of flavors user explicitly selected
+        - selected_textures: list of textures user explicitly selected
+        
+        Returns a vector to be added/subtracted from the user's preference vector.
+        """
+        update_vector = np.zeros(len(self.feature_cols))
+        feedback_type = feedback_data.get("feedback_type", "liked")
+        sign = 1.0 if feedback_type == "liked" else -1.0
+        
+        selected_ingredients = feedback_data.get("selected_ingredients", []) or []
+        selected_flavors = feedback_data.get("selected_flavors", []) or []
+        selected_textures = feedback_data.get("selected_textures", []) or []
+        recipe_ingredients = feedback_data.get("recipe_ingredients", []) or []
+        
+        # Calculate feedback signal strength
+        explicit_feedback_count = len(selected_ingredients) + len(selected_flavors) + len(selected_textures)
+        has_explicit_feedback = explicit_feedback_count > 0
+        
+        # ─── COMPONENT 1: Explicitly Selected Ingredients (0.4 weight if provided) ───
+        if selected_ingredients:
+            ingredient_vector = self._get_average_food_vector(selected_ingredients)
+            if ingredient_vector is not None:
+                ingredient_vector = np.asarray(ingredient_vector, dtype=np.float64)
+                update_vector += sign * 0.4 * ingredient_vector
+        
+        # ─── COMPONENT 2: Explicitly Selected Flavors (0.25 weight if provided) ───
+        offset = len(self.tag_cols)
+        for flavor in selected_flavors:
+            if flavor in self.tag_cols:
+                flavor_idx = self.tag_cols.index(flavor)
+                update_vector[flavor_idx] += sign * 0.25
+        
+        # ─── COMPONENT 3: Explicitly Selected Textures (0.25 weight if provided) ───
+        for texture in selected_textures:
+            if texture in self.tag_cols:
+                texture_idx = self.tag_cols.index(texture)
+                update_vector[texture_idx] += sign * 0.25
+        
+        # ─── COMPONENT 4: Full Recipe Ingredients (weighted by signal strength) ───
+        # Weak signal from explicit feedback = 0.1 weight (user was specific, so don't over-weight full recipe)
+        # Strong signal from implicit (no selections) = 0.2 weight (we rely more on recipe context)
+        recipe_weight = 0.1 if has_explicit_feedback else 0.2
+        
+        if recipe_ingredients:
+            recipe_vector = self._get_average_food_vector(recipe_ingredients)
+            if recipe_vector is not None:
+                recipe_vector = np.asarray(recipe_vector, dtype=np.float64)
+                update_vector += sign * recipe_weight * recipe_vector
+        
+        return update_vector
