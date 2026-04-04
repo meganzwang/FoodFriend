@@ -51,6 +51,67 @@ def init_db():
             preferences TEXT NOT NULL DEFAULT '{}'
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recommendation_runs (
+            run_id            TEXT PRIMARY KEY,
+            user_id           TEXT,
+            created_at        TEXT NOT NULL,
+            input_profile     TEXT NOT NULL DEFAULT '{}',
+            top_ingredients   TEXT NOT NULL DEFAULT '[]'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recommended_recipes (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id            TEXT NOT NULL,
+            user_id           TEXT,
+            recipe_id         TEXT NOT NULL,
+            rank_position     INTEGER NOT NULL,
+            title             TEXT NOT NULL,
+            image             TEXT,
+            source_url        TEXT,
+            ready_in_minutes  INTEGER,
+            calories          REAL,
+            diets_json        TEXT NOT NULL DEFAULT '[]',
+            ingredients_json  TEXT NOT NULL DEFAULT '[]',
+            was_selected      INTEGER NOT NULL DEFAULT 0,
+            selected_at       TEXT,
+            feedback_type     TEXT,
+            feedback_at       TEXT,
+            FOREIGN KEY(run_id) REFERENCES recommendation_runs(run_id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS recipe_feedback_events (
+            id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id                    TEXT NOT NULL,
+            user_id                   TEXT NOT NULL,
+            recipe_id                 TEXT NOT NULL,
+            recipe_title              TEXT,
+            feedback_type             TEXT NOT NULL,
+            recipe_ingredients_json   TEXT NOT NULL DEFAULT '[]',
+            selected_ingredients_json TEXT NOT NULL DEFAULT '[]',
+            selected_flavors_json     TEXT NOT NULL DEFAULT '[]',
+            selected_textures_json    TEXT NOT NULL DEFAULT '[]',
+            created_at                TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES recommendation_runs(run_id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_reco_runs_user_created ON recommendation_runs(user_id, created_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_reco_recipes_run ON recommended_recipes(run_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_reco_recipes_user ON recommended_recipes(user_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_feedback_user_created ON recipe_feedback_events(user_id, created_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_feedback_run ON recipe_feedback_events(run_id)"
+    )
     conn.commit()
     conn.close()
     print(f"SQLite DB ready at {DB_PATH}")
@@ -311,6 +372,7 @@ async def rank_ingredients(request: Request):
 async def recommend_recipes(request: Request):
     try:
         user_profile = await request.json()
+        user_id = (user_profile.get("user_id") or "").upper() or None
 
         api_key = os.getenv("SPOONACULAR_API_KEY")
         if not api_key:
@@ -363,7 +425,55 @@ async def recommend_recipes(request: Request):
             if len(recipes) >= 20:
                 break
 
+        recommendation_run_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+
+        conn = get_db()
+        try:
+            conn.execute(
+                """
+                INSERT INTO recommendation_runs (run_id, user_id, created_at, input_profile, top_ingredients)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    recommendation_run_id,
+                    user_id,
+                    now,
+                    json.dumps(user_profile),
+                    json.dumps(top_ingredient_names),
+                ),
+            )
+
+            for idx, recipe in enumerate(recipes, start=1):
+                conn.execute(
+                    """
+                    INSERT INTO recommended_recipes (
+                        run_id, user_id, recipe_id, rank_position, title, image, source_url,
+                        ready_in_minutes, calories, diets_json, ingredients_json
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        recommendation_run_id,
+                        user_id,
+                        str(recipe.get("id")),
+                        idx,
+                        recipe.get("title", "Untitled Recipe"),
+                        recipe.get("image", ""),
+                        recipe.get("sourceUrl", ""),
+                        recipe.get("readyInMinutes"),
+                        recipe.get("calories"),
+                        json.dumps(recipe.get("diets", []) or []),
+                        json.dumps(recipe.get("ingredients", []) or []),
+                    ),
+                )
+
+            conn.commit()
+        finally:
+            conn.close()
+
         return {
+            "recommendation_run_id": recommendation_run_id,
             "top_ingredients": top_ingredient_names,
             "ranked": top_ranked,
             "filtered": filtered,
@@ -463,6 +573,343 @@ async def process_recipe_feedback(request: Request):
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
+
+
+@app.post("/api/recommendation-runs/{run_id}/selected-recipes")
+async def mark_selected_recipes(run_id: str, request: Request):
+    """
+    Mark which recipes from a recommendation run were selected.
+    """
+    try:
+        body = await request.json()
+        user_id = (body.get("user_id") or "").upper() or None
+        selected_recipe_ids = [
+            str(recipe_id)
+            for recipe_id in (body.get("selected_recipe_ids") or [])
+            if recipe_id is not None
+        ]
+
+        conn = get_db()
+        try:
+            run = conn.execute(
+                "SELECT run_id, user_id FROM recommendation_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if not run:
+                raise HTTPException(status_code=404, detail="Recommendation run not found")
+
+            if user_id and run["user_id"] and user_id != run["user_id"]:
+                raise HTTPException(status_code=403, detail="Run does not belong to this user")
+
+            conn.execute(
+                "UPDATE recommended_recipes SET was_selected = 0, selected_at = NULL WHERE run_id = ?",
+                (run_id,),
+            )
+
+            now = datetime.now().isoformat()
+            for recipe_id in selected_recipe_ids:
+                conn.execute(
+                    """
+                    UPDATE recommended_recipes
+                    SET was_selected = 1, selected_at = ?
+                    WHERE run_id = ? AND recipe_id = ?
+                    """,
+                    (now, run_id, recipe_id),
+                )
+
+            conn.commit()
+        finally:
+            conn.close()
+
+        return {
+            "status": "success",
+            "run_id": run_id,
+            "selected_count": len(selected_recipe_ids),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+
+@app.post("/api/log-recipe-feedback")
+async def log_recipe_feedback(request: Request):
+    """
+    Persist per-recipe liked/disliked feedback for a recommendation run.
+    """
+    try:
+        body = await request.json()
+        run_id = (body.get("run_id") or "").strip()
+        user_id = (body.get("user_id") or "").upper()
+        feedback_entries = body.get("feedback") or []
+
+        if not run_id:
+            raise HTTPException(status_code=400, detail="run_id is required")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id is required")
+
+        conn = get_db()
+        try:
+            run = conn.execute(
+                "SELECT run_id, user_id FROM recommendation_runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if not run:
+                raise HTTPException(status_code=404, detail="Recommendation run not found")
+            if run["user_id"] and run["user_id"] != user_id:
+                raise HTTPException(status_code=403, detail="Run does not belong to this user")
+
+            now = datetime.now().isoformat()
+            inserted = 0
+            for entry in feedback_entries:
+                recipe_id = entry.get("recipe_id")
+                feedback_type = str(entry.get("feedback_type") or "").lower().strip()
+                if recipe_id is None or feedback_type not in {"liked", "disliked"}:
+                    continue
+
+                recipe_id_str = str(recipe_id)
+
+                conn.execute(
+                    """
+                    INSERT INTO recipe_feedback_events (
+                        run_id, user_id, recipe_id, recipe_title, feedback_type,
+                        recipe_ingredients_json, selected_ingredients_json,
+                        selected_flavors_json, selected_textures_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        user_id,
+                        recipe_id_str,
+                        entry.get("recipe_title", ""),
+                        feedback_type,
+                        json.dumps(entry.get("recipe_ingredients", []) or []),
+                        json.dumps(entry.get("selected_ingredients", []) or []),
+                        json.dumps(entry.get("selected_flavors", []) or []),
+                        json.dumps(entry.get("selected_textures", []) or []),
+                        now,
+                    ),
+                )
+
+                conn.execute(
+                    """
+                    UPDATE recommended_recipes
+                    SET feedback_type = ?, feedback_at = ?
+                    WHERE run_id = ? AND recipe_id = ?
+                    """,
+                    (feedback_type, now, run_id, recipe_id_str),
+                )
+                inserted += 1
+
+            conn.commit()
+        finally:
+            conn.close()
+
+        return {
+            "status": "success",
+            "run_id": run_id,
+            "logged_feedback_count": inserted,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+
+@app.get("/api/admin/users/{user_id}/recipe-history")
+async def get_user_recipe_history(user_id: str, include_details: bool = False):
+    """
+    Author-only data endpoint: returns a compact per-recipe status view.
+    Set include_details=true for the full run-by-run payload.
+    """
+    normalized_user_id = user_id.upper()
+    conn = get_db()
+    try:
+        user = conn.execute(
+            "SELECT id, name, created_at, updated_at FROM users WHERE id = ?",
+            (normalized_user_id,),
+        ).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        run_rows = conn.execute(
+            """
+            SELECT run_id, created_at, top_ingredients
+            FROM recommendation_runs
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (normalized_user_id,),
+        ).fetchall()
+
+        preferences_row = conn.execute(
+            "SELECT preferences FROM users WHERE id = ?",
+            (normalized_user_id,),
+        ).fetchone()
+        preferences = json.loads(preferences_row["preferences"] or "{}") if preferences_row else {}
+
+        tried_recipe_ids = {
+            str(recipe_id)
+            for recipe_id in (preferences.get("tried_recipe_ids") or [])
+            if recipe_id is not None
+        }
+        tried_recipes = preferences.get("tried_recipes") or []
+        tried_recipe_feedback = {
+            str(recipe.get("id")): str(recipe.get("feedbackType") or "").lower()
+            for recipe in tried_recipes
+            if isinstance(recipe, dict) and recipe.get("id") is not None
+        }
+
+        recipe_status_map = {}
+        recipe_title_lookup = {}
+        recipe_seen_at = {}
+
+        for run in run_rows:
+            recipe_rows = conn.execute(
+                """
+                SELECT recipe_id, rank_position, title, image, source_url, ready_in_minutes,
+                       calories, diets_json, ingredients_json, was_selected, selected_at,
+                       feedback_type, feedback_at
+                FROM recommended_recipes
+                WHERE run_id = ?
+                ORDER BY rank_position ASC
+                """,
+                (run["run_id"],),
+            ).fetchall()
+
+            for row in recipe_rows:
+                recipe_id = str(row["recipe_id"])
+                title = row["title"]
+
+                recipe_title_lookup.setdefault(recipe_id, title)
+                recipe_seen_at[recipe_id] = min(
+                    recipe_seen_at.get(recipe_id, row["selected_at"] or run["created_at"]),
+                    row["selected_at"] or run["created_at"],
+                ) if recipe_id in recipe_seen_at else (row["selected_at"] or run["created_at"])
+
+                status_set = recipe_status_map.setdefault(recipe_id, set())
+                status_set.add("recommended")
+
+                if row["was_selected"]:
+                    status_set.add("selected")
+                if row["feedback_type"] == "liked":
+                    status_set.add("liked")
+                    status_set.add("selected")
+                elif row["feedback_type"] == "disliked":
+                    status_set.add("disliked")
+                    status_set.add("selected")
+
+                if recipe_id in tried_recipe_ids:
+                    status_set.add("selected")
+
+                feedback_from_preferences = tried_recipe_feedback.get(recipe_id)
+                if feedback_from_preferences == "liked":
+                    status_set.add("liked")
+                    status_set.add("selected")
+                elif feedback_from_preferences == "disliked":
+                    status_set.add("disliked")
+                    status_set.add("selected")
+
+        feedback_rows = conn.execute(
+            """
+            SELECT recipe_id, recipe_title, feedback_type, created_at
+            FROM recipe_feedback_events
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            """,
+            (normalized_user_id,),
+        ).fetchall()
+
+        for feedback in feedback_rows:
+            recipe_id = str(feedback["recipe_id"])
+            title = feedback["recipe_title"] or recipe_title_lookup.get(recipe_id) or recipe_id
+            recipe_title_lookup.setdefault(recipe_id, title)
+            status_set = recipe_status_map.setdefault(recipe_id, set())
+            status_set.add("selected")
+            status_set.add(str(feedback["feedback_type"]).lower())
+
+        compact_recipes = []
+        for recipe_id, statuses in recipe_status_map.items():
+            compact_recipes.append(
+                {
+                    "recipe_id": recipe_id,
+                    "recipe_name": recipe_title_lookup.get(recipe_id, recipe_id),
+                    "statuses": sorted(statuses),
+                    "first_seen_at": recipe_seen_at.get(recipe_id),
+                }
+            )
+
+        compact_recipes.sort(key=lambda item: (item["recipe_name"].lower(), item["recipe_id"]))
+
+        summary = {
+            "recipes": len(compact_recipes),
+            "recommended": sum(1 for recipe in compact_recipes if "recommended" in recipe["statuses"]),
+            "selected": sum(1 for recipe in compact_recipes if "selected" in recipe["statuses"]),
+            "liked": sum(1 for recipe in compact_recipes if "liked" in recipe["statuses"]),
+            "disliked": sum(1 for recipe in compact_recipes if "disliked" in recipe["statuses"]),
+        }
+
+        response = {
+            "user": {
+                "id": user["id"],
+                "name": user["name"],
+                "created_at": user["created_at"],
+                "updated_at": user["updated_at"],
+            },
+            "summary": summary,
+            "recipes": compact_recipes,
+        }
+
+        if include_details:
+            runs = []
+            for run in run_rows:
+                recipe_rows = conn.execute(
+                    """
+                    SELECT recipe_id, rank_position, title, image, source_url, ready_in_minutes,
+                           calories, diets_json, ingredients_json, was_selected, selected_at,
+                           feedback_type, feedback_at
+                    FROM recommended_recipes
+                    WHERE run_id = ?
+                    ORDER BY rank_position ASC
+                    """,
+                    (run["run_id"],),
+                ).fetchall()
+
+                runs.append(
+                    {
+                        "run_id": run["run_id"],
+                        "created_at": run["created_at"],
+                        "top_ingredients": json.loads(run["top_ingredients"] or "[]"),
+                        "recommended_recipes": [
+                            {
+                                "recipe_id": row["recipe_id"],
+                                "rank_position": row["rank_position"],
+                                "title": row["title"],
+                                "image": row["image"],
+                                "source_url": row["source_url"],
+                                "ready_in_minutes": row["ready_in_minutes"],
+                                "calories": row["calories"],
+                                "diets": json.loads(row["diets_json"] or "[]"),
+                                "ingredients": json.loads(row["ingredients_json"] or "[]"),
+                                "was_selected": bool(row["was_selected"]),
+                                "selected_at": row["selected_at"],
+                                "feedback_type": row["feedback_type"],
+                                "feedback_at": row["feedback_at"],
+                            }
+                            for row in recipe_rows
+                        ],
+                    }
+                )
+
+            response["runs"] = runs
+
+        return response
+    finally:
+        conn.close()
 
 
 # ─── Entrypoint ───────────────────────────────────────────────────────────────

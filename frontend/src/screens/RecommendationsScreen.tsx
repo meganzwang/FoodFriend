@@ -17,9 +17,13 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { CONFIG } from "../config";
 
 const STORAGE_KEY = "@user_preferences";
+const USER_ID_KEY = "@food_friend_user_id";
 const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
 const PAGE_SIZE = 5;
 const MAX_VISIBLE_RECIPES = 20;
+
+type StoredUserPreferences = UserPreferences & { user_id?: string };
 
 type RecommendationsScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -45,7 +49,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     setIsLoading(true);
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
-      const prefs: UserPreferences = saved ? JSON.parse(saved) : {};
+      const prefs: StoredUserPreferences = saved ? JSON.parse(saved) : {};
 
       const response = await fetch(`${CONFIG.API_URL}/api/recommend-recipes`, {
         method: "POST",
@@ -65,6 +69,15 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       setRecommendations(data.recipes || []);
       setVisibleCount(PAGE_SIZE);
       setSelectedRecipeIds([]);
+
+      if (data.recommendation_run_id) {
+        await AsyncStorage.setItem(
+          ACTIVE_RECOMMENDATION_RUN_KEY,
+          String(data.recommendation_run_id),
+        );
+      } else {
+        await AsyncStorage.removeItem(ACTIVE_RECOMMENDATION_RUN_KEY);
+      }
     } catch (error) {
       console.error("Error fetching recommendations:", error);
       Alert.alert("Error", "Could not fetch recommendations.");
@@ -97,6 +110,34 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     const selectedRecipes = recommendations.filter((recipe) =>
       selectedRecipeIds.includes(recipe.id),
     );
+
+    try {
+      const [saved, userIdFromKey, recommendationRunId] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEY),
+        AsyncStorage.getItem(USER_ID_KEY),
+        AsyncStorage.getItem(ACTIVE_RECOMMENDATION_RUN_KEY),
+      ]);
+
+      const savedPrefs: StoredUserPreferences = saved ? JSON.parse(saved) : {};
+      const resolvedUserId = userIdFromKey || savedPrefs.user_id;
+
+      if (recommendationRunId && resolvedUserId) {
+        await fetch(
+          `${CONFIG.API_URL}/api/recommendation-runs/${recommendationRunId}/selected-recipes`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: resolvedUserId,
+              selected_recipe_ids: selectedRecipeIds,
+            }),
+          },
+        );
+      }
+    } catch (error) {
+      console.warn("Could not sync selected recipes to backend history");
+    }
+
     await AsyncStorage.setItem(
       WEEKLY_SELECTED_RECIPES_KEY,
       JSON.stringify(selectedRecipes),
