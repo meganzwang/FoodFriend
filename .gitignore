@@ -31,3 +31,7 @@ venv/
 # Local output / logs
 user_profiles.csv
 user_testing_aggregate.csv
+
+# Local SQLite database
+data/foodfriend.db
+data/foodfriend.db

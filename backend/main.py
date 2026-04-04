@@ -6,6 +6,7 @@ import re
 import socket
 import sqlite3
 import uuid
+import numpy as np
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from model import FoodFriendModel
@@ -367,6 +368,96 @@ async def recommend_recipes(request: Request):
             "ranked": top_ranked,
             "filtered": filtered,
             "recipes": recipes,
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+
+# ─── Process Recipe Feedback ──────────────────────────────────────────────────
+
+@app.post("/api/process-recipe-feedback")
+async def process_recipe_feedback(request: Request):
+    """
+    Process explicit recipe feedback and intelligently update user preferences.
+    
+    Expected payload:
+    {
+      "user_id": "USER-ID",
+      "recipe_id": 12345,
+      "recipe_title": "Chicken Stir Fry",
+      "feedback_type": "liked" or "disliked",
+      "recipe_ingredients": ["chicken breast", "broccoli", "soy sauce"],
+      "selected_ingredients": ["chicken breast"],
+      "selected_flavors": ["spicy", "umami"],
+      "selected_textures": ["crispy"]
+    }
+    """
+    try:
+        body = await request.json()
+        user_id = (body.get("user_id") or "").upper()
+        
+        if not user_id:
+            return {"error": "user_id is required"}
+        
+        # Fetch current user preferences
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT preferences FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if not row:
+                return {"error": "User not found"}
+            
+            current_prefs = json.loads(row["preferences"] or "{}")
+        finally:
+            conn.close()
+        
+        # Calculate the weighted feedback update
+        feedback_data = {
+            "feedback_type": body.get("feedback_type", "liked"),
+            "recipe_ingredients": body.get("recipe_ingredients", []),
+            "selected_ingredients": body.get("selected_ingredients", []),
+            "selected_flavors": body.get("selected_flavors", []),
+            "selected_textures": body.get("selected_textures", []),
+        }
+        
+        update_vector = model.calculate_feedback_vector_update(feedback_data)
+        
+        # Store the update vector as a running aggregate for intelligent preference refinement
+        if "feedback_vector_sum" not in current_prefs:
+            current_prefs["feedback_vector_sum"] = update_vector.tolist()
+        else:
+            # Accumulate feedback vectors with slight decay (0.95 factor) so recent feedback matters more
+            existing_vec = np.array(current_prefs["feedback_vector_sum"], dtype=np.float64)
+            existing_vec *= 0.95  # Slight decay of past feedback influence
+            current_prefs["feedback_vector_sum"] = (existing_vec + update_vector).tolist()
+        
+        # Keep the feedback-vector path as the sole signal to avoid double counting.
+        feedback_type = body.get("feedback_type", "liked")
+        
+        # Save updated preferences to database
+        conn = get_db()
+        try:
+            conn.execute(
+                "UPDATE users SET preferences = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(current_prefs), datetime.now().isoformat(), user_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        
+        return {
+            "status": "success",
+            "user_id": user_id,
+            "feedback_type": feedback_type,
+            "explicit_selections": {
+                "ingredients": len(body.get("selected_ingredients", [])),
+                "flavors": len(body.get("selected_flavors", [])),
+                "textures": len(body.get("selected_textures", [])),
+            },
+            "message": "Recipe feedback processed and preference vector updated"
         }
     except Exception as e:
         import traceback
