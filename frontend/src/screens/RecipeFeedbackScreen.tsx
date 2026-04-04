@@ -47,6 +47,9 @@ interface RecipeFeedbackEntry {
 const STORAGE_KEY = "@user_preferences";
 const USER_ID_KEY = "@food_friend_user_id";
 const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
+
+type StoredUserPreferences = Partial<UserPreferences> & { user_id?: string };
 
 const mergeUnique = (existing: string[] = [], incoming: string[] = []) =>
   Array.from(new Set([...(existing || []), ...(incoming || [])]));
@@ -142,14 +145,13 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
 
     setIsSaving(true);
     try {
-      const [savedRaw, userId] = await Promise.all([
+      const [savedRaw, userId, recommendationRunId] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEY),
         AsyncStorage.getItem(USER_ID_KEY),
+        AsyncStorage.getItem(ACTIVE_RECOMMENDATION_RUN_KEY),
       ]);
 
-      const saved = savedRaw
-        ? (JSON.parse(savedRaw) as Partial<UserPreferences>)
-        : {};
+      const saved: StoredUserPreferences = savedRaw ? JSON.parse(savedRaw) : {};
 
       const likedEntries = Object.values(feedbackByRecipe).filter(
         (entry) => entry.type === "liked",
@@ -241,6 +243,36 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         STORAGE_KEY,
         JSON.stringify({ ...updatedPrefs, user_id: userId || undefined }),
       );
+
+      try {
+        if (userId && recommendationRunId) {
+          const feedbackPayload = selectedRecipes
+            .filter(
+              (recipe) => recipe?.id != null && feedbackByRecipe[recipe.id],
+            )
+            .map((recipe) => ({
+              recipe_id: recipe.id,
+              recipe_title: recipe.title,
+              feedback_type: feedbackByRecipe[recipe.id].type,
+              recipe_ingredients: recipe.ingredients || [],
+              selected_ingredients: feedbackByRecipe[recipe.id].ingredients,
+              selected_flavors: feedbackByRecipe[recipe.id].flavors,
+              selected_textures: feedbackByRecipe[recipe.id].textures,
+            }));
+
+          await fetch(`${CONFIG.API_URL}/api/log-recipe-feedback`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              run_id: recommendationRunId,
+              user_id: userId,
+              feedback: feedbackPayload,
+            }),
+          });
+        }
+      } catch (error) {
+        console.warn("Could not sync recipe feedback history to backend");
+      }
 
       try {
         const controller = new AbortController();
