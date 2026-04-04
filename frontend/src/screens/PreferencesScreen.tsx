@@ -21,7 +21,6 @@ import {
   NUTRIENT_GOALS,
   FLAVORS,
   TEXTURES,
-  CUISINES,
 } from "../../types";
 import { CONFIG } from "../config";
 
@@ -261,27 +260,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           Help us personalize your food recommendations
         </Text>
 
-        {/* Show the user's ID as a subtle reminder */}
-        {userId && (
-          <View style={styles.idBadge}>
-            <Text style={styles.idBadgeLabel}>Your ID</Text>
-            <Text style={styles.idBadgeValue}>{userId}</Text>
-          </View>
-        )}
-
-        <SectionHeader
-          title="Your Name"
-          subtitle="How should we address you?"
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Enter your name"
-          value={preferences.name}
-          onChangeText={(val) =>
-            setPreferences((prev) => ({ ...prev, name: val }))
-          }
-        />
-
         <SectionHeader
           title="Allergies & Intolerances"
           subtitle="Ingredients I need to avoid"
@@ -335,13 +313,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
             activeColor="#D32F2F"
           />
         </View>
-
-        <SectionHeader title="Preferred Cuisines" />
-        <MultiSelectGroup
-          options={CUISINES}
-          selected={preferences.cuisines}
-          onToggle={(val) => toggleSelection("cuisines", val)}
-        />
 
         <SectionHeader title="Preferred Foods" />
         <Text style={styles.helperText}>
@@ -481,31 +452,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     marginBottom: 16,
-  },
-  idBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E8F5E9",
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginBottom: 16,
-    alignSelf: "flex-start",
-    gap: 8,
-  },
-  idBadgeLabel: {
-    fontSize: 12,
-    color: "#4CAF50",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  idBadgeValue: {
-    fontSize: 14,
-    fontFamily: "monospace",
-    fontWeight: "700",
-    color: "#2E7D32",
-    letterSpacing: 2,
   },
   sectionHeader: {
     marginTop: 20,
