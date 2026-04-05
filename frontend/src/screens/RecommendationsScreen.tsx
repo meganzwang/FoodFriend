@@ -12,18 +12,23 @@ import {
   TouchableOpacity,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Recipe, RootStackParamList, UserPreferences } from "../../types";
+import { CompositeNavigationProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import {
+  MainTabParamList,
+  Recipe,
+  RootStackParamList,
+  UserPreferences,
+} from "../../types";
 import { CONFIG } from "../config";
 
 const STORAGE_KEY = "@user_preferences";
-const USER_ID_KEY = "@food_friend_user_id";
 const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+const USER_ID_KEY = "@food_friend_user_id";
 const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
 const PAGE_SIZE = 5;
 const MAX_VISIBLE_RECIPES = 20;
-
-type StoredUserPreferences = UserPreferences & { user_id?: string };
 
 type RecommendationsScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -142,9 +147,21 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       WEEKLY_SELECTED_RECIPES_KEY,
       JSON.stringify(selectedRecipes),
     );
-    navigation.navigate("MainApp", {
-      screen: "ThisWeekRecipes",
-      params: { selectedRecipes },
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: "MainApp",
+          state: {
+            routes: [
+              {
+                name: "ThisWeekRecipes",
+                params: { selectedRecipes },
+              },
+            ],
+          },
+        },
+      ],
     });
   };
 
@@ -282,7 +299,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
               onPress={() => void handleContinueToFeedback()}
             >
               <Text style={styles.continueButtonText}>
-                Continue to Feedback ({selectedRecipeIds.length} selected)
+                Continue
               </Text>
             </TouchableOpacity>
           )}

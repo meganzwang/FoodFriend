@@ -18,6 +18,7 @@ export type MainTabParamList = {
   ThisWeekRecipes: { selectedRecipes?: Recipe[] } | undefined;
   ThisWeekGroceries: undefined;
   AllTriedRecipes: undefined;
+  MyProgress: undefined;
   Profile: undefined;
 };
 
@@ -28,6 +29,18 @@ export interface TriedRecipe {
   sourceUrl: string;
   feedbackType: "liked" | "disliked";
   triedAt: string;
+  calories?: number;
+  protein?: number;
+  fat?: number;
+  sodium?: number;
+  fiber?: number;
+  sugar?: number;
+  saturated_fat?: number;
+  iron?: number;
+  readyInMinutes?: number;
+  ingredients?: string[];
+  diets?: string[];
+  summary?: string;
 }
 
 // Define enums for specific choices to ensure consistency and prevent typos
@@ -176,6 +189,13 @@ export interface Recipe {
   sourceUrl: string;
   readyInMinutes?: number;
   calories?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+  sodium?: number | null;
+  fiber?: number | null;
+  sugar?: number | null;
+  saturated_fat?: number | null;
+  iron?: number | null;
   diets?: string[];
   summary?: string;
   ingredients?: string[];

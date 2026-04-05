@@ -6,7 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
+  Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -101,9 +104,51 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
     [selectedRecipes, feedbackByRecipe],
   );
 
-  const openFeedbackModal = (recipe: Recipe, type: FeedbackType) => {
-    setActiveRecipe(recipe);
-    setActiveType(type);
+  const setRecipeReaction = (recipe: Recipe, type: FeedbackType) => {
+    if (!recipe?.id) return;
+
+    setFeedbackByRecipe((prev) => ({
+      ...prev,
+      [recipe.id]: {
+        type,
+        ingredients: prev[recipe.id]?.ingredients || [],
+        flavors: prev[recipe.id]?.flavors || [],
+        textures: prev[recipe.id]?.textures || [],
+      },
+    }));
+  };
+
+  const removeRecipe = async (recipeToRemove: Recipe) => {
+    Alert.alert(
+      "Remove Recipe",
+      `Remove "${recipeToRemove.title}" from this week's recipes?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            const updatedRecipes = selectedRecipes.filter(
+              (recipe) => recipe.id !== recipeToRemove.id
+            );
+            setSelectedRecipes(updatedRecipes);
+
+            // Update AsyncStorage
+            await AsyncStorage.setItem(
+              WEEKLY_SELECTED_RECIPES_KEY,
+              JSON.stringify(updatedRecipes),
+            );
+
+            // Remove any feedback for this recipe
+            setFeedbackByRecipe((prev) => {
+              const updated = { ...prev };
+              delete updated[recipeToRemove.id];
+              return updated;
+            });
+          },
+        },
+      ],
+    );
   };
 
   const handleModalSubmit = (feedback: {
@@ -186,6 +231,18 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
           sourceUrl: recipe.sourceUrl,
           feedbackType: feedbackByRecipe[recipe.id].type,
           triedAt: new Date().toISOString(),
+          calories: recipe.calories,
+          protein: recipe.protein,
+          fat: recipe.fat,
+          sodium: recipe.sodium,
+          fiber: recipe.fiber,
+          sugar: recipe.sugar,
+          saturated_fat: recipe.saturated_fat,
+          iron: recipe.iron,
+          readyInMinutes: recipe.readyInMinutes,
+          ingredients: recipe.ingredients,
+          diets: recipe.diets,
+          summary: recipe.summary,
         }));
 
       const existingTried = saved.tried_recipes || [];
@@ -311,11 +368,8 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Recipe Feedback</Text>
-      <Text style={styles.subtitle}>
-        Mark each selected recipe as liked or disliked, then choose why.
-      </Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Your Weekly Recipes</Text>
 
       <Text style={styles.progressText}>
         Reviewed {completedCount} of {selectedRecipes.length}
@@ -326,28 +380,72 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
           const feedback = recipe?.id ? feedbackByRecipe[recipe.id] : undefined;
           return (
             <View key={`${recipe.id}-${recipe.title}`} style={styles.card}>
-              <Text style={styles.recipeTitle}>{recipe.title}</Text>
-              <Text style={styles.recipeMeta}>
-                {recipe.readyInMinutes
-                  ? `${recipe.readyInMinutes} min`
-                  : "Time N/A"}
-                {recipe.calories
-                  ? ` • ${Math.round(recipe.calories)} kcal`
-                  : ""}
-              </Text>
+              <View style={styles.cardHeader}>
+                {recipe.image ? (
+                  <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
+                ) : (
+                  <View style={styles.recipeImagePlaceholder}>
+                    <Text style={styles.placeholderText}>No image</Text>
+                  </View>
+                )}
+                <View style={styles.cardHeaderContent}>
+                  <View style={styles.titleRow}>
+                    <TouchableOpacity
+                      style={styles.titleTouchable}
+                      onPress={() => {
+                        if (recipe.sourceUrl) {
+                          Linking.openURL(recipe.sourceUrl).catch(() =>
+                            Alert.alert("Error", "Could not open recipe link")
+                          );
+                        }
+                      }}
+                    >
+                      <Text style={[styles.recipeTitle, styles.recipeTitleLink]}>
+                        {recipe.title}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => removeRecipe(recipe)}
+                    >
+                      <Text style={styles.removeButtonText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.recipeMeta}>
+                    {recipe.readyInMinutes
+                      ? `${recipe.readyInMinutes} min`
+                      : "Time N/A"}
+                    {recipe.calories
+                      ? ` • ${Math.round(recipe.calories)} kcal`
+                      : ""}
+                  </Text>
+                </View>
+              </View>
 
-              <View style={styles.row}>
+              <View style={styles.actionsRow}>
                 <TouchableOpacity
-                  style={[styles.choiceButton, styles.likeButton]}
-                  onPress={() => openFeedbackModal(recipe, "liked")}
+                  style={[
+                    styles.thumbButton,
+                    feedback?.type === "liked" && styles.thumbButtonLiked,
+                  ]}
+                  onPress={() => setRecipeReaction(recipe, "liked")}
                 >
-                  <Text style={styles.choiceButtonText}>Liked</Text>
+                  <Text style={styles.thumbEmoji}>👍</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.choiceButton, styles.dislikeButton]}
-                  onPress={() => openFeedbackModal(recipe, "disliked")}
+                  style={[
+                    styles.thumbButton,
+                    feedback?.type === "disliked" && styles.thumbButtonDisliked,
+                  ]}
+                  onPress={() => setRecipeReaction(recipe, "disliked")}
                 >
-                  <Text style={styles.choiceButtonText}>Disliked</Text>
+                  <Text style={styles.thumbEmoji}>👎</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.tellUsMoreButton}
+                  onPress={() => openTellUsMore(recipe)}
+                >
+                  <Text style={styles.tellUsMoreText}>Tell us more</Text>
                 </TouchableOpacity>
               </View>
 
@@ -369,7 +467,7 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         disabled={isSaving}
       >
         <Text style={styles.submitButtonText}>
-          {isSaving ? "Saving..." : "Save Feedback & Generate More Recipes"}
+          {isSaving ? "Saving..." : "Save & Continue"}
         </Text>
       </TouchableOpacity>
 
@@ -380,29 +478,22 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         onClose={() => setActiveRecipe(null)}
         onSubmit={handleModalSubmit}
       />
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#F5F5F5",
-    padding: 16,
+    padding: 20,
   },
   title: {
     fontSize: 24,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: "#333",
-    textAlign: "center",
-    marginTop: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 12,
+    marginBottom: 6,
+    textAlign: "left",
   },
   progressText: {
     textAlign: "center",
@@ -432,37 +523,111 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 13,
   },
-  row: {
-    flexDirection: "row",
-    gap: 8,
+  actionsRow: {
+    color: "#1976D2",
+    textDecorationLine: "underline",
   },
-  choiceButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
+  recipeMeta: {
+    marginTop: 4,
+    marginBottom: 12,
+    color: "#666",
+    fontSize: 13,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  recipeImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: "#F0F0F0",
+  },
+  recipeImagePlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: "#F0F0F0",
+    justifyContent: "center",
     alignItems: "center",
   },
-  likeButton: {
-    backgroundColor: "#2E7D32",
+  placeholderText: {
+    fontSize: 11,
+    color: "#999",
+    textAlign: "center",
   },
-  dislikeButton: {
-    backgroundColor: "#D32F2F",
+  cardHeaderContent: {
+    flex: 1,
   },
-  choiceButtonText: {
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  titleTouchable: {
+    flex: 1,
+  },
+  removeButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  removeButtonText: {
+    fontSize: 18,
+    color: "#666",
+    fontWeight: "bold",
+  },
+  thumbButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#E0E0E0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  thumbButtonLiked: {
+    borderColor: "#4CAF50",
+    backgroundColor: "#F1F8F4",
+  },
+  thumbButtonDisliked: {
+    borderColor: "#D32F2F",
+    backgroundColor: "#FFEBEE",
+  },
+  thumbEmoji: {
+    fontSize: 24,
+  },
+  tellUsMoreButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#1976D2",
+    alignItems: "center",
+  },
+  tellUsMoreText: {
     color: "#fff",
     fontWeight: "700",
-  },
-  statusText: {
-    marginTop: 10,
-    color: "#444",
-    fontSize: 12,
+    fontSize: 13,
   },
   submitButton: {
     backgroundColor: "#1976D2",
     paddingVertical: 14,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: "center",
-    marginBottom: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  statusText: {
+    display: "none",
   },
   submitButtonDisabled: {
     opacity: 0.7,

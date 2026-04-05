@@ -10,15 +10,26 @@ import {
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { TriedRecipe, UserPreferences } from "../../types";
+import { TriedRecipe, UserPreferences, Recipe } from "../../types";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../types";
 
 type FilterType = "all" | "liked" | "disliked";
 
 const STORAGE_KEY = "@user_preferences";
+const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+
+type AllTriedRecipesNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "RecipePicker"
+>;
 
 const AllTriedRecipesScreen: React.FC = () => {
+  const navigation = useNavigation<AllTriedRecipesNavigationProp>();
   const [recipes, setRecipes] = useState<TriedRecipe[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<number[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -52,6 +63,83 @@ const AllTriedRecipesScreen: React.FC = () => {
     }
 
     await Linking.openURL(url);
+  };
+
+  const toggleRecipeSelection = (recipeId: number) => {
+    setSelectedRecipeIds((prev) =>
+      prev.includes(recipeId)
+        ? prev.filter((id) => id !== recipeId)
+        : [...prev, recipeId],
+    );
+  };
+
+  const handleAddToWeekly = async () => {
+    if (selectedRecipeIds.length === 0) {
+      Alert.alert(
+        "Select Recipes",
+        "Choose at least one recipe to add to this week.",
+      );
+      return;
+    }
+
+    const selectedRecipes: Recipe[] = recipes
+      .filter((recipe) => selectedRecipeIds.includes(recipe.id))
+      .map((triedRecipe) => ({
+        id: triedRecipe.id,
+        title: triedRecipe.title,
+        image: triedRecipe.image,
+        sourceUrl: triedRecipe.sourceUrl,
+        calories: triedRecipe.calories,
+        protein: triedRecipe.protein,
+        fat: triedRecipe.fat,
+        sodium: triedRecipe.sodium,
+        fiber: triedRecipe.fiber,
+        sugar: triedRecipe.sugar,
+        saturated_fat: triedRecipe.saturated_fat,
+        iron: triedRecipe.iron,
+        readyInMinutes: triedRecipe.readyInMinutes,
+        ingredients: triedRecipe.ingredients,
+        diets: triedRecipe.diets,
+        summary: triedRecipe.summary,
+      }));
+
+    try {
+      const existing = await AsyncStorage.getItem(WEEKLY_SELECTED_RECIPES_KEY);
+      const existingRecipes: Recipe[] = existing ? JSON.parse(existing) : [];
+      
+      // Merge, removing duplicates by ID
+      const recipeMap = new Map<number, Recipe>();
+      [...existingRecipes, ...selectedRecipes].forEach((recipe) => {
+        recipeMap.set(recipe.id, recipe);
+      });
+
+      await AsyncStorage.setItem(
+        WEEKLY_SELECTED_RECIPES_KEY,
+        JSON.stringify(Array.from(recipeMap.values())),
+      );
+
+      navigation.reset({
+        index: 0,
+        routes: [
+          {
+            name: "MainApp",
+            state: {
+              routes: [
+                {
+                  name: "ThisWeekRecipes",
+                  params: { selectedRecipes: Array.from(recipeMap.values()) },
+                },
+              ],
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        "Failed to add recipes. Please try again.",
+      );
+    }
   };
 
   return (
@@ -103,16 +191,49 @@ const AllTriedRecipesScreen: React.FC = () => {
                 Status: {recipe.feedbackType} • Tried{" "}
                 {new Date(recipe.triedAt).toLocaleDateString()}
               </Text>
-              <TouchableOpacity
-                style={styles.linkButton}
-                onPress={() => openRecipe(recipe.sourceUrl)}
-              >
-                <Text style={styles.linkButtonText}>View Recipe</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => openRecipe(recipe.sourceUrl)}
+                >
+                  <Text style={styles.linkButtonText}>View Recipe</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.selectButton,
+                    selectedRecipeIds.includes(recipe.id) &&
+                      styles.selectButtonActive,
+                  ]}
+                  onPress={() => toggleRecipeSelection(recipe.id)}
+                >
+                  <Text
+                    style={[
+                      styles.selectButtonText,
+                      selectedRecipeIds.includes(recipe.id) &&
+                        styles.selectButtonTextActive,
+                    ]}
+                  >
+                    {selectedRecipeIds.includes(recipe.id)
+                      ? "Added"
+                      : "Add to Week"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}
       </ScrollView>
+
+      {selectedRecipeIds.length > 0 && (
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={handleAddToWeekly}
+        >
+          <Text style={styles.confirmButtonText}>
+            Add {selectedRecipeIds.length} Recipe{selectedRecipeIds.length > 1 ? "s" : ""} to This Week
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -190,6 +311,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   linkButton: {
+    flex: 1,
     backgroundColor: "#1976D2",
     paddingVertical: 10,
     borderRadius: 8,
@@ -198,6 +320,42 @@ const styles = StyleSheet.create({
   linkButtonText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  selectButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#1976D2",
+    alignItems: "center",
+  },
+  selectButtonActive: {
+    backgroundColor: "#1976D2",
+  },
+  selectButtonText: {
+    color: "#1976D2",
+    fontWeight: "700",
+  },
+  selectButtonTextActive: {
+    color: "#fff",
+  },
+  confirmButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });
 

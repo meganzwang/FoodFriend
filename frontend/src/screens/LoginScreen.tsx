@@ -92,12 +92,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       }
 
       const data = await res.json();
+      if (!data?.user_id) {
+        throw new Error("Server response missing user ID.");
+      }
+      const newUserId = String(data.user_id);
 
       // Persist user ID and seed local prefs with name
-      await AsyncStorage.setItem(USER_ID_KEY, data.user_id);
+      await AsyncStorage.setItem(USER_ID_KEY, newUserId);
       await AsyncStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ name: trimmed, user_id: data.user_id }),
+        JSON.stringify({ name: trimmed, user_id: newUserId }),
       );
 
       Alert.alert(
@@ -136,15 +140,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       if (!res.ok) throw new Error("Server error");
 
       const data = await res.json();
+      if (!data?.user_id) {
+        throw new Error("Server response missing user ID.");
+      }
+      const returningUserId = String(data.user_id);
 
       // Restore preferences from server into local storage
-      await AsyncStorage.setItem(USER_ID_KEY, data.user_id);
+      await AsyncStorage.setItem(USER_ID_KEY, returningUserId);
       await AsyncStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
           ...data.preferences,
           name: data.name,
-          user_id: data.user_id,
+          user_id: returningUserId,
         }),
       );
 

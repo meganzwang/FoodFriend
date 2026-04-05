@@ -39,6 +39,64 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+def diversify_recipes_by_ingredient_overlap(recipes, top_n=20, penalty_weight=0.35):
+    """Return recipes reordered to favor diversity over ingredient overlap."""
+    if not recipes:
+        return []
+
+    normalized_recipes = []
+    for idx, recipe in enumerate(recipes):
+        ingredients = {
+            ing.strip().lower()
+            for ing in (recipe.get("ingredients") or [])
+            if isinstance(ing, str) and ing.strip()
+        }
+        normalized_recipes.append(
+            {
+                **recipe,
+                "_ingredient_set": ingredients,
+                "_base_score": float(len(recipes) - idx),
+            }
+        )
+
+    selected = []
+    selected_ingredient_union = set()
+    remaining = normalized_recipes.copy()
+
+    while remaining and len(selected) < top_n:
+        best = None
+        best_score = float("-inf")
+
+        for recipe in remaining:
+            ingredients = recipe["_ingredient_set"]
+            overlap = 0.0
+            if ingredients and selected_ingredient_union:
+                overlap = len(ingredients & selected_ingredient_union) / float(
+                    len(ingredients)
+                )
+            score = recipe["_base_score"] * (1.0 - penalty_weight * overlap)
+            if score > best_score:
+                best_score = score
+                best = recipe
+
+        if best is None:
+            break
+
+        selected.append(best)
+        selected_ingredient_union.update(best["_ingredient_set"])
+        remaining.remove(best)
+
+    return [
+        {
+            k: v
+            for k, v in recipe.items()
+            if k not in ("_ingredient_set", "_base_score")
+        }
+        for recipe in selected
+    ]
+
+
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = get_db()
@@ -401,10 +459,21 @@ async def recommend_recipes(request: Request):
                 continue
 
             nutrients = recipe.get('nutrition', {}).get('nutrients', [])
-            calories = next(
-                (n.get('amount') for n in nutrients if str(n.get('name', '')).lower() == 'calories'),
-                None,
-            )
+            def nutrient_amount(name):
+                return next(
+                    (n.get('amount') for n in nutrients if str(n.get('name', '')).lower() == name),
+                    None,
+                )
+
+            calories = nutrient_amount('calories')
+            protein = nutrient_amount('protein')
+            fat = nutrient_amount('fat')
+            sodium = nutrient_amount('sodium')
+            fiber = nutrient_amount('fiber')
+            sugar = nutrient_amount('sugar')
+            saturated_fat = nutrient_amount('saturated fat')
+            iron = nutrient_amount('iron')
+
             ingredients = [
                 ing.get('name', '').lower().strip()
                 for ing in recipe.get('extendedIngredients', [])
@@ -418,12 +487,25 @@ async def recommend_recipes(request: Request):
                 "readyInMinutes": recipe.get("readyInMinutes"),
                 "diets": recipe.get("diets", []),
                 "calories": calories,
+                "protein": protein,
+                "fat": fat,
+                "sodium": sodium,
+                "fiber": fiber,
+                "sugar": sugar,
+                "saturated_fat": saturated_fat,
+                "iron": iron,
                 "summary": recipe.get("summary", ""),
                 "ingredients": ingredients,
             })
 
             if len(recipes) >= 20:
                 break
+
+        recipes = diversify_recipes_by_ingredient_overlap(
+            recipes,
+            top_n=20,
+            penalty_weight=0.35,
+        )
 
         recommendation_run_id = str(uuid.uuid4())
         now = datetime.now().isoformat()

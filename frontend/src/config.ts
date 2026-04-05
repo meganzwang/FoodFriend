@@ -13,7 +13,7 @@ const getDevHostIp = (): string | null => {
 };
 
 const getApiUrl = (): string => {
-  const envUrl = (process as any)?.env?.EXPO_PUBLIC_API_URL;
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl) {
     return envUrl;
   }
