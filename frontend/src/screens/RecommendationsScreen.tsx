@@ -39,6 +39,8 @@ interface RecommendationsScreenProps {
   navigation: RecommendationsScreenNavigationProp;
 }
 
+type StoredUserPreferences = Partial<UserPreferences> & { user_id?: string };
+
 const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
   navigation,
 }) => {

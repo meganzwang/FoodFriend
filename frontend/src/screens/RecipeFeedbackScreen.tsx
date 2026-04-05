@@ -11,7 +11,6 @@ import {
   Image,
   Linking,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -59,6 +58,10 @@ type StoredUserPreferences = Partial<UserPreferences> & { user_id?: string };
 const mergeUnique = (existing: string[] = [], incoming: string[] = []) =>
   Array.from(new Set([...(existing || []), ...(incoming || [])]));
 
+const asNumberOrUndefined = (
+  value: number | null | undefined,
+): number | undefined => (typeof value === "number" ? value : undefined);
+
 const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
   route,
   navigation,
@@ -74,11 +77,11 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
   >({});
   const [isSaving, setIsSaving] = useState(false);
 
-    // Handler for "Tell us more" button
-    const openTellUsMore = (recipe: Recipe) => {
-      setActiveRecipe(recipe);
-      setActiveType(feedbackByRecipe[recipe.id]?.type || "liked");
-    };
+  // Handler for "Tell us more" button
+  const openTellUsMore = (recipe: Recipe) => {
+    setActiveRecipe(recipe);
+    setActiveType(feedbackByRecipe[recipe.id]?.type || "liked");
+  };
 
   useEffect(() => {
     const loadSelectedRecipes = async () => {
@@ -137,7 +140,7 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
           style: "destructive",
           onPress: async () => {
             const updatedRecipes = selectedRecipes.filter(
-              (recipe) => recipe.id !== recipeToRemove.id
+              (recipe) => recipe.id !== recipeToRemove.id,
             );
             setSelectedRecipes(updatedRecipes);
 
@@ -239,15 +242,15 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
           sourceUrl: recipe.sourceUrl,
           feedbackType: feedbackByRecipe[recipe.id].type,
           triedAt: new Date().toISOString(),
-          calories: recipe.calories,
-          protein: recipe.protein,
-          fat: recipe.fat,
-          sodium: recipe.sodium,
-          fiber: recipe.fiber,
-          sugar: recipe.sugar,
-          saturated_fat: recipe.saturated_fat,
-          iron: recipe.iron,
-          readyInMinutes: recipe.readyInMinutes,
+          calories: asNumberOrUndefined(recipe.calories),
+          protein: asNumberOrUndefined(recipe.protein),
+          fat: asNumberOrUndefined(recipe.fat),
+          sodium: asNumberOrUndefined(recipe.sodium),
+          fiber: asNumberOrUndefined(recipe.fiber),
+          sugar: asNumberOrUndefined(recipe.sugar),
+          saturated_fat: asNumberOrUndefined(recipe.saturated_fat),
+          iron: asNumberOrUndefined(recipe.iron),
+          readyInMinutes: asNumberOrUndefined(recipe.readyInMinutes),
           ingredients: recipe.ingredients,
           diets: recipe.diets,
           summary: recipe.summary,
@@ -390,7 +393,10 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
             <View key={`${recipe.id}-${recipe.title}`} style={styles.card}>
               <View style={styles.cardHeader}>
                 {recipe.image ? (
-                  <Image source={{ uri: recipe.image }} style={styles.recipeImage} />
+                  <Image
+                    source={{ uri: recipe.image }}
+                    style={styles.recipeImage}
+                  />
                 ) : (
                   <View style={styles.recipeImagePlaceholder}>
                     <Text style={styles.placeholderText}>No image</Text>
@@ -403,12 +409,14 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
                       onPress={() => {
                         if (recipe.sourceUrl) {
                           Linking.openURL(recipe.sourceUrl).catch(() =>
-                            Alert.alert("Error", "Could not open recipe link")
+                            Alert.alert("Error", "Could not open recipe link"),
                           );
                         }
                       }}
                     >
-                      <Text style={[styles.recipeTitle, styles.recipeTitleLink]}>
+                      <Text
+                        style={[styles.recipeTitle, styles.recipeTitleLink]}
+                      >
                         {recipe.title}
                       </Text>
                     </TouchableOpacity>
@@ -525,13 +533,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333",
   },
-  recipeMeta: {
-    marginTop: 4,
-    marginBottom: 12,
-    color: "#666",
-    fontSize: 13,
-  },
-  actionsRow: {
+  recipeTitleLink: {
     color: "#1976D2",
     textDecorationLine: "underline",
   },
