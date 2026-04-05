@@ -110,7 +110,20 @@ def diversify_recipes_by_ingredient_overlap(recipes, top_n=20, penalty_weight=0.
 
 
 def init_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    global DB_PATH
+
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    except PermissionError:
+        fallback_db_path = os.path.join("/tmp", "foodfriend.db")
+        print(
+            "WARNING: Cannot write to configured DB path. "
+            f"Falling back to temporary DB at {fallback_db_path}. "
+            "Set FOODFRIEND_DB_PATH to a writable persistent disk path in production."
+        )
+        DB_PATH = fallback_db_path
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
     conn = get_db()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
