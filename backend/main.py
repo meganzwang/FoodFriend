@@ -30,7 +30,10 @@ app.add_middleware(
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "final_vectorized_ingredients.csv")
 AGGREGATE_CSV = os.path.join(os.path.dirname(__file__), "..", "user_testing_aggregate.csv")
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "foodfriend.db")
+DB_PATH = os.getenv(
+    "FOODFRIEND_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "data", "foodfriend.db"),
+)
 
 
 def log_top_ingredients(recommendation_run_id, user_id, top_ingredient_names):
