@@ -65,6 +65,9 @@ const MultiSelectGroup: React.FC<{
 );
 
 const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
+  const handleBack = () => {
+    navigation.navigate("Welcome");
+  };
   const [preferences, setPreferences] = useState<UserPreferences>({
     intolerances: [],
     diet: [],
@@ -175,6 +178,12 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>{'←'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.titleHeader}>Goals</Text>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>What are your goals?</Text>
       
@@ -222,6 +231,28 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  backButton: {
+    marginRight: 10,
+    padding: 4,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: "#1976D2",
+    fontWeight: "bold",
+  },
+  titleHeader: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333",
+    textAlign: "left",
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
