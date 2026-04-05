@@ -252,8 +252,18 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
     );
   }
 
+  const handleBack = () => {
+    navigation.navigate("Goals");
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>{'←'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.titleHeader}>Preferences</Text>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Your Preferences</Text>
       
@@ -420,6 +430,28 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  backButton: {
+    marginRight: 10,
+    padding: 4,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: "#1976D2",
+    fontWeight: "bold",
+  },
+  titleHeader: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333",
+    textAlign: "left",
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",

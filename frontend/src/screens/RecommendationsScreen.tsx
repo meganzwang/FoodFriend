@@ -11,6 +11,7 @@ import {
   Linking,
   TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CompositeNavigationProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -199,9 +200,20 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
     }
   };
 
+  const handleBack = () => {
+    navigation.navigate("RecipeFeedback");
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Your Weekly Recommendations</Text>
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#f5f5f5" }}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Text style={styles.backButtonText}>{'←'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.titleHeader}>Your Weekly Recommendations</Text>
+        </View>
+      </SafeAreaView>
 
       {isLoading ? (
         <ActivityIndicator
@@ -301,6 +313,28 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  backButton: {
+    marginRight: 10,
+    padding: 4,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: "#1976D2",
+    fontWeight: "bold",
+  },
+  titleHeader: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333",
+    textAlign: "left",
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 15,
