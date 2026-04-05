@@ -9,7 +9,7 @@ import {
   Alert,
   FlatList,
 } from "react-native";
-import { Picker } from '@react-native-picker/picker';
+// import { Picker } from '@react-native-picker/picker';
 import Modal from 'react-native-modal';
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -96,7 +96,8 @@ const MyProgressScreen: React.FC = () => {
   const [selectedNutrient, setSelectedNutrient] = useState<NutrientGoal>("calories");
   const [includeIngredientsInPdf, setIncludeIngredientsInPdf] = useState(true);
   const [includeNutrientInPdf, setIncludeNutrientInPdf] = useState(false);
-  const [selectedPdfNutrient, setSelectedPdfNutrient] = useState<NutrientGoal>("calories");
+  // For PDF, allow multi-select
+  const [selectedPdfNutrients, setSelectedPdfNutrients] = useState<NutrientGoal[]>(["calories"]);
   const [ingredientModalVisible, setIngredientModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
   const [includeRecipesLiked, setIncludeRecipesLiked] = useState(false);
@@ -220,14 +221,19 @@ const MyProgressScreen: React.FC = () => {
     return statistics.filter((stat) => selectedReportStats.includes(stat.id));
   }, [statistics, selectedReportStats]);
 
-  const selectedNutrientAverage = useMemo(() => {
-    if (triedRecipes.length === 0) return 0;
-    const total = triedRecipes.reduce((sum, recipe) => {
-      const value = Number((recipe as any)[selectedPdfNutrient] ?? 0);
-      return sum + (Number.isFinite(value) ? value : 0);
-    }, 0);
-    return total / triedRecipes.length;
-  }, [selectedPdfNutrient, triedRecipes]);
+  // For PDF, compute averages for all selected nutrients
+  const selectedPdfNutrientAverages = useMemo(() => {
+    if (triedRecipes.length === 0) return {};
+    const result: Record<NutrientGoal, number> = {};
+    selectedPdfNutrients.forEach((nutrient) => {
+      const total = triedRecipes.reduce((sum, recipe) => {
+        const value = Number((recipe as any)[nutrient] ?? 0);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+      result[nutrient] = total / triedRecipes.length;
+    });
+    return result;
+  }, [selectedPdfNutrients, triedRecipes]);
 
   const trendPoints = useMemo<TrendPoint[]>(() => {
     const grouped: Record<string, { total: number; count: number }> = {};
@@ -250,26 +256,30 @@ const MyProgressScreen: React.FC = () => {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [selectedNutrient, triedRecipes]);
 
-  const pdfTrendPoints = useMemo<TrendPoint[]>(() => {
-    const grouped: Record<string, { total: number; count: number }> = {};
-    triedRecipes.forEach((recipe) => {
-      const dateKey = recipe.triedAt ? recipe.triedAt.slice(0, 10) : "Unknown";
-      const value = Number((recipe as any)[selectedPdfNutrient] ?? 0);
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = { total: 0, count: 0 };
-      }
-      grouped[dateKey].total += Number.isFinite(value) ? value : 0;
-      grouped[dateKey].count += 1;
+  // For PDF, compute trend points for all selected nutrients
+  const pdfTrendPoints = useMemo(() => {
+    const result: Record<NutrientGoal, TrendPoint[]> = {};
+    selectedPdfNutrients.forEach((nutrient) => {
+      const grouped: Record<string, { total: number; count: number }> = {};
+      triedRecipes.forEach((recipe) => {
+        const dateKey = recipe.triedAt ? recipe.triedAt.slice(0, 10) : "Unknown";
+        const value = Number((recipe as any)[nutrient] ?? 0);
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = { total: 0, count: 0 };
+        }
+        grouped[dateKey].total += Number.isFinite(value) ? value : 0;
+        grouped[dateKey].count += 1;
+      });
+      result[nutrient] = Object.entries(grouped)
+        .map(([date, stats]) => ({
+          label: date,
+          value: stats.count > 0 ? stats.total / stats.count : 0,
+          count: stats.count,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
     });
-
-    return Object.entries(grouped)
-      .map(([date, stats]) => ({
-        label: date,
-        value: stats.count > 0 ? stats.total / stats.count : 0,
-        count: stats.count,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [selectedPdfNutrient, triedRecipes]);
+    return result;
+  }, [selectedPdfNutrients, triedRecipes]);
 
   const buildReportHtml = () => {
     const sections: string[] = [];
@@ -278,7 +288,7 @@ const MyProgressScreen: React.FC = () => {
 
     // Ingredients tried
     if (includeIngredientsInPdf) {
-      sections.push(`<h2>All Ingredients Tried</h2>`);
+      sections.push(`<h2>New ingredients you have tried</h2>`);
       if (uniqueIngredients.length > 0) {
         sections.push(`<p>${uniqueIngredients.length} unique ingredients tried.</p>`);
         sections.push(`<p>${uniqueIngredients.slice(0, 20).join(", ")}${uniqueIngredients.length > 20 ? ", ..." : ""}</p>`);
@@ -290,58 +300,37 @@ const MyProgressScreen: React.FC = () => {
     // Nutrient progress and ingredient trend
     if (includeNutrientInPdf) {
       sections.push(`<h2>Nutrient Progress</h2>`);
-      sections.push(`<p>Average <strong>${nutrientLabels[selectedPdfNutrient]}</strong> per meal: <strong>${selectedNutrientAverage.toFixed(0)}</strong></p>`);
-      if (selectedIngredient) {
-        // Plot average amount of ingredient per meal over time
-        // (For simplicity, just list the ingredient and a placeholder)
-        sections.push(`<h3>Ingredient: ${selectedIngredient}</h3>`);
-        sections.push(`<p>Average amount per meal over time: (plot here)</p>`);
-      }
+      selectedPdfNutrients.forEach((nutrient) => {
+        const avg = selectedPdfNutrientAverages[nutrient] ?? 0;
+        sections.push(`<p>Average <strong>${nutrientLabels[nutrient]}</strong> per meal: <strong>${avg.toFixed(0)}</strong></p>`);
+      });
     }
 
-    // Recipes liked
-    if (includeRecipesLiked) {
+
+    // Comprehensive summary for recipes
+    if (includeRecipesLiked || includeRecipesDisliked || includeTotalRecipes || includeRepeatRecipesInPdf) {
       const liked = triedRecipes.filter(r => r.feedbackType === "liked");
-      sections.push(`<h2>Recipes Liked</h2>`);
+      const disliked = triedRecipes.filter(r => r.feedbackType === "disliked");
+      const total = triedRecipes.length;
+      const readded = repeatRecipeTitles.length;
+      sections.push(`<h2>Recipes Tried</h2>`);
+      sections.push(`<p>${total} total &mdash; ${liked.length} liked, ${disliked.length} disliked, ${readded} re-added to this week's plan.</p>`);
       if (liked.length > 0) {
-        sections.push(`<ul>`);
+        sections.push(`<strong>Liked:</strong> <ul>`);
         liked.forEach(r => sections.push(`<li>${r.title}</li>`));
         sections.push(`</ul>`);
-      } else {
-        sections.push(`<p>No liked recipes yet.</p>`);
       }
-    }
-
-    // Recipes disliked
-    if (includeRecipesDisliked) {
-      const disliked = triedRecipes.filter(r => r.feedbackType === "disliked");
-      sections.push(`<h2>Recipes Disliked</h2>`);
       if (disliked.length > 0) {
-        sections.push(`<ul>`);
+        sections.push(`<strong>Disliked:</strong> <ul>`);
         disliked.forEach(r => sections.push(`<li>${r.title}</li>`));
         sections.push(`</ul>`);
-      } else {
-        sections.push(`<p>No disliked recipes yet.</p>`);
       }
-    }
-
-    // Total recipes
-    if (includeTotalRecipes) {
-      sections.push(`<h2>Total Recipes Tried</h2>`);
-      sections.push(`<p>${triedRecipes.length} recipes tried.</p>`);
-    }
-
-    // Recipes re-added
-    if (includeRepeatRecipesInPdf) {
-      sections.push(`<h2>Recipes Re-added</h2>`);
-      if (repeatRecipeTitles.length > 0) {
-        sections.push(`<ul>`);
+      if (readded > 0) {
+        sections.push(`<strong>Re-added:</strong> <ul>`);
         repeatRecipeTitles.forEach((title) => {
           sections.push(`<li>${title}</li>`);
         });
         sections.push(`</ul>`);
-      } else {
-        sections.push(`<p>No recipes were re-added to this week's plan.</p>`);
       }
     }
 
@@ -362,15 +351,17 @@ const MyProgressScreen: React.FC = () => {
         <meta charset="utf-8" />
         <title>FoodFriend Progress Report</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
-          h1 { color: #1976D2; }
-          h2 { color: #4CAF50; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #222; background: #f8fafc; }
+          h1 { color: #2d6cdf; margin-bottom: 0.5em; }
+          h2 { color: #222; margin-top: 1.5em; margin-bottom: 0.5em; }
           ul { padding-left: 20px; }
           li { margin-bottom: 8px; }
           table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-          th { background: #f2f7fb; }
-          strong { color: #333; }
+          th, td { border: 1px solid #e0e0e0; padding: 8px; text-align: left; }
+          th { background: #e3f2fd; color: #1976d2; }
+          td { background: #fff; }
+          strong { color: #222; }
+          p { margin: 0.5em 0; }
         </style>
       </head>
       <body>
@@ -442,44 +433,55 @@ const MyProgressScreen: React.FC = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Nutrient Progress</Text>
-          <View style={{ marginBottom: 12 }}>
-            <Text style={styles.sectionSubtitle}>Select nutrient to view progress:</Text>
-            <View style={{ borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, backgroundColor: '#fff' }}>
-              <Picker
-                selectedValue={selectedNutrient}
-                onValueChange={setSelectedNutrient}
-                style={{ height: 44 }}
+          <Text style={styles.sectionSubtitle}>Select nutrient to view progress:</Text>
+          <View style={styles.nutrientButtonsRow}>
+            {userGoalNutrients.map((nutrient) => (
+              <TouchableOpacity
+                key={nutrient}
+                style={
+                  nutrient === selectedNutrient
+                    ? styles.nutrientButtonSelected
+                    : styles.nutrientButton
+                }
+                onPress={() => setSelectedNutrient(nutrient)}
               >
-                {userGoalNutrients.map((nutrient) => (
-                  <Picker.Item key={nutrient} label={nutrientLabels[nutrient]} value={nutrient} />
-                ))}
-              </Picker>
-            </View>
+                <Text
+                  style={
+                    nutrient === selectedNutrient
+                      ? styles.nutrientButtonTextSelected
+                      : styles.nutrientButtonText
+                  }
+                >
+                  {nutrientLabels[nutrient]}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
           <View style={styles.nutrientCard}>
             <Text style={styles.nutrientAmount}>
               {nutrientAverage.toFixed(0)} {nutrientUnits[selectedNutrient]}
             </Text>
             <Text style={styles.nutrientLabel}>
-              Average {nutrientLabels[selectedNutrient]} per meal
+              Average {nutrientLabels[selectedNutrient]} per meal (weekly)
             </Text>
           </View>
-
           {trendPoints.length > 0 && (
-            <View style={styles.trendSection}>
-              <Text style={styles.trendTitle}>Trend over time</Text>
-              {trendPoints.map((point) => (
-                <View key={point.label} style={styles.trendRow}>
-                  <Text style={styles.trendLabel}>{point.label}</Text>
-                  <View style={styles.trendBarBackground}>
+            <View style={{ marginTop: 16 }}>
+              <Text style={{ fontWeight: '600', marginBottom: 6, color: '#333' }}>Weekly trend</Text>
+              {trendPoints.map((point, idx) => (
+                <View key={point.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ width: 80, fontSize: 12, color: '#555' }}>{point.label}</Text>
+                  <View style={{ flex: 1, height: 12, backgroundColor: '#e3f2fd', borderRadius: 6, marginHorizontal: 8 }}>
                     <View
-                      style={[
-                        styles.trendBarFill,
-                        { width: `${Math.min(point.value / Math.max(...trendPoints.map((p) => p.value || 1)) * 100, 100)}%` },
-                      ]}
+                      style={{
+                        width: `${Math.min((point.value / Math.max(...trendPoints.map(p => p.value || 1))) * 100, 100)}%`,
+                        height: 12,
+                        backgroundColor: '#1976d2',
+                        borderRadius: 6,
+                      }}
                     />
                   </View>
-                  <Text style={styles.trendValue}>{point.value.toFixed(0)}</Text>
+                  <Text style={{ width: 40, fontSize: 12, color: '#333', textAlign: 'right' }}>{point.value.toFixed(0)}</Text>
                 </View>
               ))}
             </View>
@@ -511,69 +513,30 @@ const MyProgressScreen: React.FC = () => {
           </View>
           {includeNutrientInPdf && (
             <View style={{ marginLeft: 32, marginBottom: 8 }}>
-              <Text style={styles.sectionSubtitle}>Select nutrient:</Text>
+              <Text style={styles.sectionSubtitle}>Select nutrients (multi-select):</Text>
               <View style={styles.nutrientButtonsRow}>
-                {userGoalNutrients.map((nutrient) => (
-                  <TouchableOpacity
-                    key={nutrient}
-                    style={
-                      nutrient === selectedPdfNutrient
-                        ? styles.nutrientButtonSelected
-                        : styles.nutrientButton
-                    }
-                    onPress={() => setSelectedPdfNutrient(nutrient)}
-                  >
-                    <Text
-                      style={
-                        nutrient === selectedPdfNutrient
-                          ? styles.nutrientButtonTextSelected
-                          : styles.nutrientButtonText
-                      }
+                {userGoalNutrients.map((nutrient) => {
+                  const selected = selectedPdfNutrients.includes(nutrient);
+                  return (
+                    <TouchableOpacity
+                      key={nutrient}
+                      style={selected ? styles.nutrientButtonSelected : styles.nutrientButton}
+                      onPress={() => {
+                        setSelectedPdfNutrients((prev) =>
+                          prev.includes(nutrient)
+                            ? prev.filter((n) => n !== nutrient)
+                            : [...prev, nutrient]
+                        );
+                      }}
                     >
-                      {nutrientLabels[nutrient]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text style={selected ? styles.nutrientButtonTextSelected : styles.nutrientButtonText}>
+                        {nutrientLabels[nutrient]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <TouchableOpacity
-                style={styles.ingredientSelectButton}
-                onPress={() => setIngredientModalVisible(true)}
-              >
-                <Text style={styles.ingredientSelectButtonText}>
-                  {selectedIngredient ? `Ingredient: ${selectedIngredient}` : 'Select ingredient to plot'}
-                </Text>
-              </TouchableOpacity>
-              <Modal
-                isVisible={ingredientModalVisible}
-                onBackdropPress={() => setIngredientModalVisible(false)}
-                style={{ justifyContent: 'flex-end', margin: 0 }}
-              >
-                <View style={styles.ingredientModal}>
-                  <Text style={styles.ingredientModalTitle}>Select Ingredient</Text>
-                  <ScrollView style={{ maxHeight: 300 }}>
-                    {uniqueIngredients.map((ingredient) => (
-                      <TouchableOpacity
-                        key={ingredient}
-                        style={styles.ingredientModalItem}
-                        onPress={() => {
-                          setSelectedIngredient(ingredient);
-                          setIngredientModalVisible(false);
-                        }}
-                      >
-                        <Text style={styles.ingredientModalItemText}>{ingredient}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <TouchableOpacity
-                    style={styles.ingredientModalCancel}
-                    onPress={() => setIngredientModalVisible(false)}
-                  >
-                    <Text style={styles.ingredientModalCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              </Modal>
             </View>
-
           )}
 
           {/* Recipes liked */}

@@ -11,6 +11,7 @@ import {
   Image,
   Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -378,9 +379,23 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
     }
   };
 
+  const handleBack = () => {
+    navigation.navigate("RecipePicker");
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Your Weekly Recipes</Text>
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#F5F5F5" }}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+          >
+            <Text style={styles.backButtonText}>{'←'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Your Weekly Recipes</Text>
+        </View>
+      </SafeAreaView>
 
       <Text style={styles.progressText}>
         Reviewed {completedCount} of {selectedRecipes.length}
@@ -504,12 +519,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
     padding: 20,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  backButton: {
+    marginRight: 10,
+    padding: 4,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: "#1976D2",
+    fontWeight: "bold",
+  },
   title: {
     fontSize: 24,
     fontWeight: "700",
     color: "#333",
-    marginBottom: 6,
     textAlign: "left",
+    flex: 1,
   },
   progressText: {
     textAlign: "center",

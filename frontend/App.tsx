@@ -122,12 +122,12 @@ export default function App() {
         <Stack.Screen
           name="RecipeFeedback"
           component={RecipeFeedbackScreen}
-          options={{ title: "Recipe Feedback" }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="RecipePicker"
           component={RecommendationsScreen}
-          options={{ title: "Pick Recipes" }}
+          options={{ headerShown: false }}
         />
         {/* After onboarding, the user enters the main app with tabs */}
         <Stack.Screen
