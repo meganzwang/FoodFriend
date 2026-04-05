@@ -199,7 +199,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
       }
 
       if (isContinue) {
-        navigation.navigate("IngredientRank");
+        navigation.navigate("RecipePicker");
       } else {
         Alert.alert("Saved!", "Your preferences have been updated.");
       }
@@ -256,13 +256,10 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Your Preferences</Text>
-        <Text style={styles.subtitle}>
-          Help us personalize your food recommendations
-        </Text>
+      
 
         <SectionHeader
           title="Allergies & Intolerances"
-          subtitle="Ingredients I need to avoid"
         />
         <MultiSelectGroup
           options={INTOLERANCES}
@@ -315,9 +312,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
         </View>
 
         <SectionHeader title="Preferred Foods" />
-        <Text style={styles.helperText}>
-          Foods you enjoy and feel comfortable eating.
-        </Text>
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -361,9 +355,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
         </View>
 
         <SectionHeader title="Disliked Foods" />
-        <Text style={styles.helperText}>
-          Foods or ingredients you want to avoid.
-        </Text>
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}

@@ -177,9 +177,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>What are your goals?</Text>
-        <Text style={styles.subtitle}>
-          Help us understand your nutritional needs and diet.
-        </Text>
+      
 
         <SectionHeader title="Diet" />
         <MultiSelectGroup

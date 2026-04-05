@@ -120,11 +120,6 @@ export default function App() {
           options={{ title: "My Preferences" }}
         />
         <Stack.Screen
-          name="IngredientRank"
-          component={IngredientRankScreen}
-          options={{ title: "Rankings" }}
-        />
-        <Stack.Screen
           name="RecipeFeedback"
           component={RecipeFeedbackScreen}
           options={{ title: "Recipe Feedback" }}

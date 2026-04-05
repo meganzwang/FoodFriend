@@ -209,17 +209,6 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
         />
       ) : (
         <ScrollView contentContainerStyle={styles.recommendationsList}>
-          {recommendedIngredients.length > 0 && (
-            <View style={styles.ingredientsCard}>
-              <Text style={styles.ingredientsTitle}>
-                Recommended Ingredients
-              </Text>
-              <Text style={styles.ingredientsList}>
-                {recommendedIngredients.join(" • ")}
-              </Text>
-            </View>
-          )}
-
           {recommendations.length === 0 ? (
             <View style={styles.emptyStateContainer}>
               <Text style={styles.emptyText}>

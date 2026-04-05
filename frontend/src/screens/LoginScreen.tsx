@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -182,7 +183,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
-        <Text style={styles.logo}>🥗</Text>
+        <Image source={require("../../assets/foodfriendlogo.png")} style={styles.logo} />
         <Text style={styles.title}>Food Friend</Text>
         <Text style={styles.subtitle}>
           Your personal food recommendation companion
@@ -304,8 +305,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   logo: {
-    fontSize: 72,
-    marginBottom: 12,
+    width: 170,
+    height: 170,
+    marginTop: 40,
+    marginBottom: -16,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 32,
