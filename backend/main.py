@@ -213,7 +213,7 @@ TARGET_INGREDIENTS = {
     "Shrimp": "shrimp",
 }
 
-MAX_TOP_INGREDIENTS = 5
+MAX_TOP_INGREDIENTS = 10
 RESTRICTED_INGREDIENTS_CSV = os.path.join(
     os.path.dirname(__file__), "..", "data", "restricted_ingredients_clean.csv"
 )
@@ -689,7 +689,7 @@ async def recommend_recipes(request: Request):
             return {"top_ingredients": [], "ranked": top_ranked, "filtered": filtered, "recipes": []}
 
         spoon = SpoonacularClient(api_key=api_key)
-        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=120)
+        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=30)
 
         candidate_recipes = []
         for recipe in spoon_recipes:
