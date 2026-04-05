@@ -1,3 +1,5 @@
+// (removed accidental top-level openTellUsMore)
+// ...existing code...
 import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
@@ -71,6 +73,12 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
     Record<number, RecipeFeedbackEntry>
   >({});
   const [isSaving, setIsSaving] = useState(false);
+
+    // Handler for "Tell us more" button
+    const openTellUsMore = (recipe: Recipe) => {
+      setActiveRecipe(recipe);
+      setActiveType(feedbackByRecipe[recipe.id]?.type || "liked");
+    };
 
   useEffect(() => {
     const loadSelectedRecipes = async () => {
