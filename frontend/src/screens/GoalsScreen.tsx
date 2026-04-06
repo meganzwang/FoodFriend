@@ -218,7 +218,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
         />
 
         <SectionHeader title="Goals to Decrease" color="#D32F2F" />
-        <Text style={[styles.helperText, { color: '#D32F2F' }]}>Select nutrients you want to limit.</Text>
+        <Text style={[styles.helperText, { color: '#888' }]}>Select nutrients you want to limit.</Text>
 
         <MultiSelectGroup
           options={NUTRIENT_GOALS}
