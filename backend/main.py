@@ -163,7 +163,19 @@ app.add_middleware(
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "final_vectorized_ingredients.csv")
 AGGREGATE_CSV = os.path.join(os.path.dirname(__file__), "..", "user_testing_aggregate.csv")
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "foodfriend.db")
+DB_PATH = os.getenv(
+    "FOODFRIEND_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "data", "foodfriend.db"),
+)
+
+
+def log_top_ingredients(recommendation_run_id, user_id, top_ingredient_names):
+    print(
+        "[TOP_INGREDIENTS] "
+        f"run={recommendation_run_id} "
+        f"user={user_id or 'anonymous'} "
+        f"ingredients={top_ingredient_names}"
+    )
 
 # ─── SQLite setup ─────────────────────────────────────────────────────────────
 
@@ -231,7 +243,20 @@ def diversify_recipes_by_ingredient_overlap(recipes, top_n=20, penalty_weight=0.
 
 
 def init_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    global DB_PATH
+
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    except PermissionError:
+        fallback_db_path = os.path.join("/tmp", "foodfriend.db")
+        print(
+            "WARNING: Cannot write to configured DB path. "
+            f"Falling back to temporary DB at {fallback_db_path}. "
+            "Set FOODFRIEND_DB_PATH to a writable persistent disk path in production."
+        )
+        DB_PATH = fallback_db_path
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
     conn = get_db()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -337,7 +362,229 @@ TARGET_INGREDIENTS = {
     "Shrimp": "shrimp",
 }
 
-MAX_TOP_INGREDIENTS = 5
+MAX_TOP_INGREDIENTS = 10
+RESTRICTED_INGREDIENTS_CSV = os.path.join(
+    os.path.dirname(__file__), "..", "data", "restricted_ingredients_clean.csv"
+)
+
+
+def _normalize_token(value):
+    token = str(value or "").strip().lower().replace("-", "_")
+    token = re.sub(r"\s+", "_", token)
+    return model._normalize_filter_key(token)
+
+
+def _normalize_ingredient_name(value):
+    normalized = str(value or "").strip().lower()
+    return re.sub(r"\s+", " ", normalized)
+
+
+def _parse_csv_labels(value):
+    if value is None:
+        return set()
+    labels = set()
+    for part in str(value).split(","):
+        cleaned = _normalize_token(part)
+        if cleaned:
+            labels.add(cleaned)
+    return labels
+
+
+class RestrictionEngine:
+    """
+    Cross-references ingredient names against restricted_ingredients_clean.csv.
+    - allergens column lists present allergens (unsafe if user has that intolerance)
+    - diet column lists diets the ingredient is safe for
+    """
+
+    def __init__(self, csv_path):
+        self.csv_path = csv_path
+        self.rows_by_name = {}
+        self._load()
+
+    def _load(self):
+        if not os.path.exists(self.csv_path):
+            print(f"WARNING: Restrictions CSV missing at {self.csv_path}")
+            return
+
+        with open(self.csv_path, mode="r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                name = _normalize_ingredient_name(row.get("name"))
+                if not name:
+                    continue
+
+                allergens = _parse_csv_labels(row.get("allergens"))
+                diets = _parse_csv_labels(row.get("diet"))
+
+                existing = self.rows_by_name.get(name)
+                if existing is None:
+                    self.rows_by_name[name] = {
+                        "allergens": set(allergens),
+                        "diets": set(diets),
+                    }
+                else:
+                    existing["allergens"].update(allergens)
+                    existing["diets"].update(diets)
+
+    def _lookup(self, ingredient_name):
+        normalized = _normalize_ingredient_name(ingredient_name)
+        if not normalized:
+            return None
+
+        exact = self.rows_by_name.get(normalized)
+        if exact is not None:
+            return exact
+
+        # Fallback for slight naming differences between APIs/datasets.
+        for known_name, data in self.rows_by_name.items():
+            if normalized in known_name or known_name in normalized:
+                return data
+
+        return None
+
+    def _keyword_violation(self, ingredient_name, active_keys):
+        lowered_name = _normalize_ingredient_name(ingredient_name)
+        for key in active_keys:
+            keywords = model.HARD_FILTERS.get(key, [])
+            if not keywords:
+                continue
+            pattern = re.compile(
+                r"\\b(?:" + "|".join(map(re.escape, keywords)) + r")",
+                re.IGNORECASE,
+            )
+            if re.search(pattern, lowered_name):
+                return key
+        return None
+
+    def check_ingredient(self, ingredient_name, active_intolerances, active_diets):
+        data = self._lookup(ingredient_name)
+
+        if data is not None:
+            allergens = data["allergens"]
+            diets = data["diets"]
+
+            violating_allergens = [key for key in active_intolerances if key in allergens]
+            if violating_allergens:
+                return False, f"allergen conflict: {', '.join(violating_allergens)}"
+
+            missing_diets = [key for key in active_diets if key not in diets]
+            if missing_diets:
+                return False, f"not marked safe for diet: {', '.join(missing_diets)}"
+
+            return True, None
+
+        # If CSV has no match, still use heuristic keyword protections.
+        allergen_hit = self._keyword_violation(ingredient_name, active_intolerances)
+        if allergen_hit:
+            return False, f"keyword allergen conflict: {allergen_hit}"
+
+        diet_hit = self._keyword_violation(ingredient_name, active_diets)
+        if diet_hit:
+            return False, f"keyword diet conflict: {diet_hit}"
+
+        return True, None
+
+
+restriction_engine = RestrictionEngine(RESTRICTED_INGREDIENTS_CSV)
+
+
+def _active_restrictions(user_profile):
+    intolerances = user_profile.get("intolerances", []) or []
+    diets = user_profile.get("diet", []) or []
+
+    if isinstance(intolerances, str):
+        intolerances = [part.strip() for part in intolerances.split(",") if part.strip()]
+    if isinstance(diets, str):
+        diets = [part.strip() for part in diets.split(",") if part.strip()]
+
+    normalized_intolerances = [_normalize_token(value) for value in intolerances]
+    normalized_diets = [_normalize_token(value) for value in diets]
+
+    return normalized_intolerances, normalized_diets
+
+
+def filter_ranked_ingredients_by_restrictions(ranked_candidates, user_profile, limit=MAX_TOP_INGREDIENTS):
+    active_intolerances, active_diets = _active_restrictions(user_profile)
+    profile_label = (user_profile or {}).get("user_id") or (user_profile or {}).get("name") or "anonymous"
+
+    accepted = []
+    rejected = []
+
+    for ingredient in ranked_candidates:
+        ingredient_name = ingredient.get("name")
+        if not ingredient_name:
+            continue
+
+        is_allowed, reason = restriction_engine.check_ingredient(
+            ingredient_name,
+            active_intolerances,
+            active_diets,
+        )
+
+        if is_allowed:
+            accepted.append(ingredient)
+            if len(accepted) >= limit:
+                break
+        else:
+            rejected.append({"name": ingredient_name, "reason": reason})
+            print(
+                "[FILTER_INGREDIENT_REMOVED] "
+                f"user={profile_label} ingredient={ingredient_name} reason={reason}"
+            )
+
+    print(
+        "[FILTER_INGREDIENT_SUMMARY] "
+        f"user={profile_label} kept={len(accepted)} removed={len(rejected)} target={limit}"
+    )
+
+    return accepted, rejected
+
+
+def filter_recipes_by_restrictions(recipes, user_profile):
+    active_intolerances, active_diets = _active_restrictions(user_profile)
+    profile_label = (user_profile or {}).get("user_id") or (user_profile or {}).get("name") or "anonymous"
+
+    accepted = []
+    rejected = []
+
+    for recipe in recipes:
+        recipe_ingredients = recipe.get("ingredients") or []
+        violation = None
+
+        for ingredient_name in recipe_ingredients:
+            is_allowed, reason = restriction_engine.check_ingredient(
+                ingredient_name,
+                active_intolerances,
+                active_diets,
+            )
+            if not is_allowed:
+                violation = {
+                    "recipe_id": recipe.get("id"),
+                    "recipe_title": recipe.get("title", "Untitled Recipe"),
+                    "ingredient": ingredient_name,
+                    "reason": reason,
+                }
+                break
+
+        if violation:
+            rejected.append(violation)
+            print(
+                "[FILTER_RECIPE_REMOVED] "
+                f"user={profile_label} recipe_id={violation.get('recipe_id')} "
+                f"recipe={violation.get('recipe_title')} "
+                f"ingredient={violation.get('ingredient')} "
+                f"reason={violation.get('reason')}"
+            )
+        else:
+            accepted.append(recipe)
+
+    print(
+        "[FILTER_RECIPE_SUMMARY] "
+        f"user={profile_label} kept={len(accepted)} removed={len(rejected)}"
+    )
+
+    return accepted, rejected
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -529,8 +776,12 @@ async def rank_ingredients(request: Request):
     try:
         user_profile = await request.json()
         normalized_profile = normalize_profile_for_model(user_profile)
-        ranked = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS)
-        filtered = []
+        ranked_pool = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS * 30)
+        ranked, filtered = filter_ranked_ingredients_by_restrictions(
+            ranked_pool,
+            user_profile,
+            limit=MAX_TOP_INGREDIENTS,
+        )
 
         with open(AGGREGATE_CSV, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -575,17 +826,21 @@ async def recommend_recipes(request: Request):
             for recipe_id in (user_profile.get("tried_recipe_ids") or [])
             if recipe_id is not None
         }
-        top_ranked = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS)
-        filtered = []
+        ranked_pool = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS * 30)
+        top_ranked, filtered = filter_ranked_ingredients_by_restrictions(
+            ranked_pool,
+            user_profile,
+            limit=MAX_TOP_INGREDIENTS,
+        )
         top_ingredient_names = [item.get('name') for item in top_ranked if item.get('name')]
 
         if not top_ingredient_names:
             return {"top_ingredients": [], "ranked": top_ranked, "filtered": filtered, "recipes": []}
 
         spoon = SpoonacularClient(api_key=api_key)
-        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=60)
+        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=30)
 
-        recipes = []
+        candidate_recipes = []
         for recipe in spoon_recipes:
             recipe_id = recipe.get("id")
             if recipe_id is not None and str(recipe_id) in tried_recipe_ids:
@@ -612,7 +867,7 @@ async def recommend_recipes(request: Request):
                 for ing in recipe.get('extendedIngredients', [])
                 if ing.get('name', '').strip()
             ]
-            recipes.append({
+            candidate_recipes.append({
                 "id": recipe_id,
                 "title": recipe.get("title", "Untitled Recipe"),
                 "image": recipe.get("image", ""),
@@ -631,13 +886,25 @@ async def recommend_recipes(request: Request):
                 "ingredients": ingredients,
             })
 
-            if len(recipes) >= 20:
-                break
+        safe_recipes, filtered_recipe_rows = filter_recipes_by_restrictions(
+            candidate_recipes,
+            user_profile,
+        )
 
         recipes = diversify_recipes_by_ingredient_overlap(
-            recipes,
+            safe_recipes,
             top_n=20,
             penalty_weight=0.35,
+        )
+
+        filtered.extend(
+            [
+                {
+                    "name": item.get("recipe_title", "Untitled Recipe"),
+                    "reason": f"ingredient '{item.get('ingredient', '')}' -> {item.get('reason', 'restricted')}",
+                }
+                for item in filtered_recipe_rows
+            ]
         )
 
         recommendation_run_id = str(uuid.uuid4())
@@ -686,6 +953,8 @@ async def recommend_recipes(request: Request):
             conn.commit()
         finally:
             conn.close()
+
+        log_top_ingredients(recommendation_run_id, user_id, top_ingredient_names)
 
         return {
             "recommendation_run_id": recommendation_run_id,
