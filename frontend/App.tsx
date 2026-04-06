@@ -30,6 +30,7 @@ function MainAppTabs() {
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
       <Tab.Navigator
+        initialRouteName="ThisWeekRecipes"
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName;
@@ -46,7 +47,9 @@ function MainAppTabs() {
             } else {
               iconName = "ellipse-outline";
             }
-            return <Ionicons name={iconName as any} size={size} color={color} />;
+            return (
+              <Ionicons name={iconName as any} size={size} color={color} />
+            );
           },
           tabBarActiveTintColor: "tomato",
           tabBarInactiveTintColor: "gray",
@@ -58,28 +61,73 @@ function MainAppTabs() {
           headerShown: false,
         })}
       >
-      <Tab.Screen
-        name="ThisWeekRecipes"
-        component={RecipeFeedbackScreen}
-        options={{ title: "Recipes" }}
-      />
-      <Tab.Screen
-        name="ThisWeekGroceries"
-        component={GroceryListScreen}
-        options={{ title: "Grocery" }}
-      />
-      <Tab.Screen
-        name="AllTriedRecipes"
-        component={AllTriedRecipesScreen}
-        options={{ title: "Tried" }}
-      />
-      <Tab.Screen
-        name="MyProgress"
-        component={MyProgressScreen}
-        options={{ title: "Progress" }}
-      />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+        <Tab.Screen
+          name="ThisWeekRecipes"
+          component={RecipeFeedbackScreen}
+          options={{ title: "Recipes" }}
+        />
+        <Tab.Screen
+          name="ThisWeekGroceries"
+          component={GroceryListScreen}
+          options={{ title: "Grocery" }}
+        />
+        <Tab.Screen
+          name="AllTriedRecipes"
+          component={AllTriedRecipesScreen}
+          options={{ title: "Tried" }}
+        />
+        <Tab.Screen
+          name="MyProgress"
+          component={MyProgressScreen}
+          options={{ title: "Progress" }}
+        />
+        <Tab.Screen name="Profile" component={ProfileScreen} />
+        <Tab.Screen
+          name="Goals"
+          component={GoalsScreen}
+          options={{
+            title: "Goals",
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: "none" },
+          }}
+        />
+        <Tab.Screen
+          name="Preferences"
+          component={PreferencesScreen}
+          options={{
+            title: "Preferences",
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: "none" },
+          }}
+        />
+        <Tab.Screen
+          name="IngredientRank"
+          component={IngredientRankScreen}
+          options={{
+            title: "IngredientRank",
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: "none" },
+          }}
+        />
+        <Tab.Screen
+          name="RecipePicker"
+          component={RecommendationsScreen}
+          options={{
+            title: "RecipePicker",
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: "none" },
+          }}
+        />
+        <Tab.Screen
+          name="RecipeFeedback"
+          component={RecipeFeedbackScreen}
+          options={{
+            title: "RecipeFeedback",
+            tabBarButton: () => null,
+            tabBarItemStyle: { display: "none" },
+          }}
+        />
+      </Tab.Navigator>
     </SafeAreaView>
   );
 }
@@ -95,48 +143,28 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Login">
           <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Welcome"
-          component={WelcomeScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="EHRLogin"
-          component={EHRLoginScreen}
-          options={{ title: "Connect to EHR" }}
-        />
-        <Stack.Screen
-          name="Goals"
-          component={GoalsScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Preferences"
-          component={PreferencesScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="RecipeFeedback"
-          component={RecipeFeedbackScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="RecipePicker"
-          component={RecommendationsScreen}
-          options={{ headerShown: false }}
-        />
-        {/* After onboarding, the user enters the main app with tabs */}
-        <Stack.Screen
-          name="MainApp"
-          component={MainAppTabs}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
-  </>
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Welcome"
+            component={WelcomeScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="EHRLogin"
+            component={EHRLoginScreen}
+            options={{ title: "Connect to EHR" }}
+          />
+          {/* After onboarding, the user enters the main app with tabs */}
+          <Stack.Screen
+            name="MainApp"
+            component={MainAppTabs}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </>
   );
 }

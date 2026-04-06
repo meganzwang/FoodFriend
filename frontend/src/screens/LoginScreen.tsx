@@ -108,7 +108,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       Alert.alert(
         "Welcome, " + trimmed + "! 🎉",
         `Your personal ID is:\n\n${data.user_id}\n\nIt's your name + a number, e.g. ALEX-42. Write it down — you can use it to log back in on any device.`,
-        [{ text: "Got it!", onPress: () => navigation.navigate("Goals") }],
+        [
+          {
+            text: "Got it!",
+            onPress: () =>
+              navigation.navigate("MainApp", {
+                screen: "Goals",
+              }),
+          },
+        ],
       );
     } catch (e: any) {
       Alert.alert(
@@ -183,7 +191,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
-        <Image source={require("../../assets/foodfriendlogo.png")} style={styles.logo} />
+        <Image
+          source={require("../../assets/foodfriendlogo.png")}
+          style={styles.logo}
+        />
         <Text style={styles.title}>Food Friend</Text>
         <Text style={styles.subtitle}>
           Your personal food recommendation companion
@@ -309,7 +320,7 @@ const styles = StyleSheet.create({
     height: 170,
     marginTop: 40,
     marginBottom: -16,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   title: {
     fontSize: 32,

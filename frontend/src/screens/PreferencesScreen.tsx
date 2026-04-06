@@ -310,29 +310,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
             selected={preferences.liked_textures}
             onToggle={(val) => toggleSelection("liked_textures", val)}
           />
-
-          {/* <SectionHeader
-          title="Goals to Increase"
-          subtitle="Nutrients to get more of"
-        />
-        <MultiSelectGroup
-          options={NUTRIENT_GOALS}
-          selected={preferences.increase_goals}
-          onToggle={(val) => toggleSelection("increase_goals", val)}
-        />
-
-        <SectionHeader
-          title="Goals to Decrease"
-          subtitle="Nutrients to limit"
-          color="#D32F2F"
-        />
-        <MultiSelectGroup
-          options={NUTRIENT_GOALS}
-          selected={preferences.decrease_goals}
-          onToggle={(val) => toggleSelection("decrease_goals", val)}
-          activeColor="#D32F2F"
-        /> */}
-
           <View style={styles.aversionContainer}>
             <SectionHeader
               title="Things I don't like"

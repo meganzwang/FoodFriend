@@ -20,6 +20,11 @@ export type MainTabParamList = {
   AllTriedRecipes: undefined;
   MyProgress: undefined;
   Profile: undefined;
+  Goals: undefined;
+  Preferences: undefined;
+  IngredientRank: undefined;
+  RecipePicker: undefined;
+  RecipeFeedback: { selectedRecipes?: Recipe[] } | undefined;
 };
 
 export interface TriedRecipe {

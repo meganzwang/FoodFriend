@@ -10,7 +10,7 @@ import {
   FlatList,
 } from "react-native";
 // import { Picker } from '@react-native-picker/picker';
-import Modal from 'react-native-modal';
+import Modal from "react-native-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from "expo-print";
@@ -27,7 +27,7 @@ type StatisticType =
   | "total_recipes"
   | "repeat_recipes";
 
-type NutrientGoal = typeof NUTRIENT_GOALS[number];
+type NutrientGoal = (typeof NUTRIENT_GOALS)[number];
 
 type TrendPoint = {
   label: string;
@@ -65,14 +65,13 @@ const nutrientUnits: Record<NutrientGoal, string> = {
 };
 
 const MyProgressScreen: React.FC = () => {
-  const [preferences, setPreferences] = useState<Partial<UserPreferences> | null>(null);
+  const [preferences, setPreferences] =
+    useState<Partial<UserPreferences> | null>(null);
   const [weeklyRecipes, setWeeklyRecipes] = useState<TriedRecipe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReportStats, setSelectedReportStats] = useState<StatisticType[]>([
-    "new_foods_tried",
-    "recipes_liked",
-    "total_recipes",
-  ]);
+  const [selectedReportStats, setSelectedReportStats] = useState<
+    StatisticType[]
+  >(["new_foods_tried", "recipes_liked", "total_recipes"]);
   // Only show nutrients that are in user's goals, fallback to all if none
   const userGoalNutrients: NutrientGoal[] = useMemo(() => {
     const inc = (preferences?.increase_goals || []) as string[];
@@ -80,30 +79,38 @@ const MyProgressScreen: React.FC = () => {
     const allGoals = Array.from(new Set([...(inc || []), ...(dec || [])]));
     // Map goal names to nutrient keys if needed
     const mapping: Record<string, NutrientGoal> = {
-      protein: 'protein',
-      fat: 'fat',
-      sodium: 'sodium',
-      fiber: 'fiber',
-      sugar: 'sugar',
-      calories: 'calories',
-      'saturated fat': 'saturated_fat',
-      iron: 'iron',
+      protein: "protein",
+      fat: "fat",
+      sodium: "sodium",
+      fiber: "fiber",
+      sugar: "sugar",
+      calories: "calories",
+      "saturated fat": "saturated_fat",
+      iron: "iron",
     };
-    const filtered = allGoals.map(g => mapping[g.toLowerCase()]).filter(Boolean) as NutrientGoal[];
+    const filtered = allGoals
+      .map((g) => mapping[g.toLowerCase()])
+      .filter(Boolean) as NutrientGoal[];
     return filtered.length > 0 ? filtered : NUTRIENT_GOALS;
   }, [preferences]);
 
-  const [selectedNutrient, setSelectedNutrient] = useState<NutrientGoal>("calories");
+  const [selectedNutrient, setSelectedNutrient] =
+    useState<NutrientGoal>("calories");
   const [includeIngredientsInPdf, setIncludeIngredientsInPdf] = useState(true);
   const [includeNutrientInPdf, setIncludeNutrientInPdf] = useState(false);
   // For PDF, allow multi-select
-  const [selectedPdfNutrients, setSelectedPdfNutrients] = useState<NutrientGoal[]>(["calories"]);
+  const [selectedPdfNutrients, setSelectedPdfNutrients] = useState<
+    NutrientGoal[]
+  >(["calories"]);
   const [ingredientModalVisible, setIngredientModalVisible] = useState(false);
-  const [selectedIngredient, setSelectedIngredient] = useState<string | null>(null);
+  const [selectedIngredient, setSelectedIngredient] = useState<string | null>(
+    null,
+  );
   const [includeRecipesLiked, setIncludeRecipesLiked] = useState(false);
   const [includeRecipesDisliked, setIncludeRecipesDisliked] = useState(false);
   const [includeTotalRecipes, setIncludeTotalRecipes] = useState(false);
-  const [includeRepeatRecipesInPdf, setIncludeRepeatRecipesInPdf] = useState(false);
+  const [includeRepeatRecipesInPdf, setIncludeRepeatRecipesInPdf] =
+    useState(false);
 
   const availableStatistics: Array<{ id: StatisticType; label: string }> = [
     { id: "new_foods_tried", label: "New Foods Tried" },
@@ -162,8 +169,12 @@ const MyProgressScreen: React.FC = () => {
   }, [triedRecipes]);
 
   const statistics = useMemo((): Statistic[] => {
-    const liked_count = triedRecipes.filter((r) => r.feedbackType === "liked").length;
-    const disliked_count = triedRecipes.filter((r) => r.feedbackType === "disliked").length;
+    const liked_count = triedRecipes.filter(
+      (r) => r.feedbackType === "liked",
+    ).length;
+    const disliked_count = triedRecipes.filter(
+      (r) => r.feedbackType === "disliked",
+    ).length;
     const total_count = triedRecipes.length;
     const repeat_count = repeatRecipes.length;
 
@@ -213,7 +224,7 @@ const MyProgressScreen: React.FC = () => {
 
   const toggleStatistic = (id: StatisticType) => {
     setSelectedReportStats((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
     );
   };
 
@@ -262,7 +273,9 @@ const MyProgressScreen: React.FC = () => {
     selectedPdfNutrients.forEach((nutrient) => {
       const grouped: Record<string, { total: number; count: number }> = {};
       triedRecipes.forEach((recipe) => {
-        const dateKey = recipe.triedAt ? recipe.triedAt.slice(0, 10) : "Unknown";
+        const dateKey = recipe.triedAt
+          ? recipe.triedAt.slice(0, 10)
+          : "Unknown";
         const value = Number((recipe as any)[nutrient] ?? 0);
         if (!grouped[dateKey]) {
           grouped[dateKey] = { total: 0, count: 0 };
@@ -281,43 +294,180 @@ const MyProgressScreen: React.FC = () => {
     return result;
   }, [selectedPdfNutrients, triedRecipes]);
 
-  // Only use HTML for PDF generation, not for rendering in JSX
   const buildReportHtml = () => {
-    // ...existing code for PDF HTML...
-    // (leave as is, only used for Print.printToFileAsync)
-    // Do not render this HTML in JSX!
-    // If you want a preview, use a plain text summary below.
-    // (No changes needed here for PDF generation)
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const selectedStatsHtml = selectedReportValues
+      .map(
+        (stat) => `
+          <div class="stat-card">
+            <div class="stat-value">${escapeHtml(String(stat.value))}</div>
+            <div class="stat-label">${escapeHtml(stat.label)}</div>
+          </div>
+        `,
+      )
+      .join("");
+
+    const ingredientsHtml = includeIngredientsInPdf
+      ? `
+        <section>
+          <h2>Ingredients Tried</h2>
+          <p><strong>Total unique ingredients:</strong> ${uniqueIngredients.length}</p>
+          ${
+            uniqueIngredients.length > 0
+              ? `<ul>${uniqueIngredients
+                  .map((ingredient) => `<li>${escapeHtml(ingredient)}</li>`)
+                  .join("")}</ul>`
+              : "<p>No ingredient history available yet.</p>"
+          }
+        </section>
+      `
+      : "";
+
+    const nutrientHtml = includeNutrientInPdf
+      ? `
+        <section>
+          <h2>Nutrient Progress</h2>
+          ${
+            selectedPdfNutrients.length > 0
+              ? selectedPdfNutrients
+                  .map((nutrient) => {
+                    const avg = selectedPdfNutrientAverages[nutrient] ?? 0;
+                    const trends = pdfTrendPoints[nutrient] || [];
+                    return `
+                      <div class="nutrient-block">
+                        <h3>${escapeHtml(nutrientLabels[nutrient])}</h3>
+                        <p>Average per meal: ${avg.toFixed(1)} ${escapeHtml(nutrientUnits[nutrient])}</p>
+                        ${
+                          trends.length > 0
+                            ? `<table><thead><tr><th>Date</th><th>Average</th><th>Meals</th></tr></thead><tbody>${trends
+                                .map(
+                                  (point) =>
+                                    `<tr><td>${escapeHtml(point.label)}</td><td>${point.value.toFixed(1)}</td><td>${point.count}</td></tr>`,
+                                )
+                                .join("")}</tbody></table>`
+                            : "<p>No trend data yet.</p>"
+                        }
+                      </div>
+                    `;
+                  })
+                  .join("")
+              : "<p>No nutrients selected.</p>"
+          }
+        </section>
+      `
+      : "";
+
+    const likedRecipes = triedRecipes.filter(
+      (recipe) => recipe.feedbackType === "liked",
+    );
+    const dislikedRecipes = triedRecipes.filter(
+      (recipe) => recipe.feedbackType === "disliked",
+    );
+
+    const recipesSummaryHtml =
+      includeRecipesLiked ||
+      includeRecipesDisliked ||
+      includeTotalRecipes ||
+      includeRepeatRecipesInPdf
+        ? `
+          <section>
+            <h2>Recipe Summary</h2>
+            ${includeTotalRecipes ? `<p><strong>Total recipes tried:</strong> ${triedRecipes.length}</p>` : ""}
+            ${includeRecipesLiked ? `<p><strong>Recipes liked:</strong> ${likedRecipes.length}</p><ul>${likedRecipes.map((r) => `<li>${escapeHtml(r.title)}</li>`).join("") || "<li>None</li>"}</ul>` : ""}
+            ${includeRecipesDisliked ? `<p><strong>Recipes disliked:</strong> ${dislikedRecipes.length}</p><ul>${dislikedRecipes.map((r) => `<li>${escapeHtml(r.title)}</li>`).join("") || "<li>None</li>"}</ul>` : ""}
+            ${includeRepeatRecipesInPdf ? `<p><strong>Recipes re-added:</strong> ${repeatRecipeTitles.length}</p><ul>${repeatRecipeTitles.map((title) => `<li>${escapeHtml(title)}</li>`).join("") || "<li>None</li>"}</ul>` : ""}
+          </section>
+        `
+        : "";
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; padding: 24px; }
+            h1 { margin-bottom: 6px; color: #111827; }
+            h2 { margin-top: 24px; margin-bottom: 8px; color: #111827; }
+            h3 { margin-top: 14px; margin-bottom: 6px; }
+            p { margin: 6px 0; line-height: 1.45; }
+            .meta { color: #6b7280; margin-bottom: 18px; }
+            .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+            .stat-card { border: 1px solid #d1d5db; border-radius: 10px; padding: 10px; }
+            .stat-value { font-size: 22px; font-weight: 700; color: #16a34a; }
+            .stat-label { font-size: 12px; color: #4b5563; margin-top: 4px; }
+            .nutrient-block { margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th, td { border: 1px solid #e5e7eb; padding: 6px 8px; font-size: 12px; text-align: left; }
+            th { background: #f9fafb; }
+            ul { margin-top: 6px; margin-bottom: 10px; }
+            li { margin-bottom: 4px; }
+          </style>
+        </head>
+        <body>
+          <h1>FoodFriend Progress Report</h1>
+          <p class="meta">Generated on ${escapeHtml(new Date().toLocaleString())}</p>
+          <section>
+            <h2>At a Glance</h2>
+            <div class="stats-grid">${selectedStatsHtml || "<p>No summary statistics selected.</p>"}</div>
+          </section>
+          ${ingredientsHtml}
+          ${nutrientHtml}
+          ${recipesSummaryHtml}
+        </body>
+      </html>
+    `;
   };
 
   // Add a plain text preview for the report (optional, not HTML)
   const buildReportPreview = () => {
-    let preview = 'FoodFriend Progress Report\n';
+    let preview = "FoodFriend Progress Report\n";
     preview += `Generated on ${new Date().toLocaleDateString()}\n`;
     if (includeIngredientsInPdf) {
       preview += `New ingredients tried: ${uniqueIngredients.length}\n`;
       if (uniqueIngredients.length > 0) {
-        preview += uniqueIngredients.slice(0, 20).join(", ") + (uniqueIngredients.length > 20 ? ", ..." : "") + '\n';
+        preview +=
+          uniqueIngredients.slice(0, 20).join(", ") +
+          (uniqueIngredients.length > 20 ? ", ..." : "") +
+          "\n";
       } else {
-        preview += 'No ingredient history available yet.\n';
+        preview += "No ingredient history available yet.\n";
       }
     }
     if (includeNutrientInPdf) {
-      preview += 'Nutrient Progress:\n';
+      preview += "Nutrient Progress:\n";
       selectedPdfNutrients.forEach((nutrient) => {
         const avg = selectedPdfNutrientAverages[nutrient] ?? 0;
         preview += `  ${nutrientLabels[nutrient]}: ${avg.toFixed(0)} ${nutrientUnits[nutrient]} per meal\n`;
       });
     }
-    if (includeRecipesLiked || includeRecipesDisliked || includeTotalRecipes || includeRepeatRecipesInPdf) {
-      const liked = triedRecipes.filter(r => r.feedbackType === "liked");
-      const disliked = triedRecipes.filter(r => r.feedbackType === "disliked");
+    if (
+      includeRecipesLiked ||
+      includeRecipesDisliked ||
+      includeTotalRecipes ||
+      includeRepeatRecipesInPdf
+    ) {
+      const liked = triedRecipes.filter((r) => r.feedbackType === "liked");
+      const disliked = triedRecipes.filter(
+        (r) => r.feedbackType === "disliked",
+      );
       const total = triedRecipes.length;
       const readded = repeatRecipeTitles.length;
       preview += `Recipes Tried: ${total} total, ${liked.length} liked, ${disliked.length} disliked, ${readded} re-added.\n`;
-      if (liked.length > 0) preview += '  Liked: ' + liked.map(r => r.title).join(", ") + '\n';
-      if (disliked.length > 0) preview += '  Disliked: ' + disliked.map(r => r.title).join(", ") + '\n';
-      if (readded > 0) preview += '  Re-added: ' + repeatRecipeTitles.join(", ") + '\n';
+      if (liked.length > 0)
+        preview += "  Liked: " + liked.map((r) => r.title).join(", ") + "\n";
+      if (disliked.length > 0)
+        preview +=
+          "  Disliked: " + disliked.map((r) => r.title).join(", ") + "\n";
+      if (readded > 0)
+        preview += "  Re-added: " + repeatRecipeTitles.join(", ") + "\n";
     }
     if (
       !includeIngredientsInPdf &&
@@ -327,7 +477,8 @@ const MyProgressScreen: React.FC = () => {
       !includeTotalRecipes &&
       !includeRepeatRecipesInPdf
     ) {
-      preview += 'No report options selected. Please enable content before generating the PDF.';
+      preview +=
+        "No report options selected. Please enable content before generating the PDF.";
     }
     return preview;
   };
@@ -337,12 +488,22 @@ const MyProgressScreen: React.FC = () => {
       selectedReportValues.length === 0 &&
       !includeNutrientInPdf &&
       !includeIngredientsInPdf &&
-      !includeRepeatRecipesInPdf &&
-      !includeTrendInPdf
+      !includeRecipesLiked &&
+      !includeRecipesDisliked &&
+      !includeTotalRecipes &&
+      !includeRepeatRecipesInPdf
     ) {
       Alert.alert(
         "Report Incomplete",
         "Please select at least one content section before generating the PDF.",
+      );
+      return;
+    }
+
+    if (includeNutrientInPdf && selectedPdfNutrients.length === 0) {
+      Alert.alert(
+        "Select Nutrients",
+        "Turned on nutrient progress, but no nutrients are selected.",
       );
       return;
     }
@@ -356,10 +517,7 @@ const MyProgressScreen: React.FC = () => {
           dialogTitle: "Share your FoodFriend progress report",
         });
       } else {
-        Alert.alert(
-          "PDF generated",
-          `Your report is saved at ${uri}`,
-        );
+        Alert.alert("PDF generated", `Your report is saved at ${uri}`);
       }
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -395,7 +553,9 @@ const MyProgressScreen: React.FC = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Nutrient Progress</Text>
-          <Text style={styles.sectionSubtitle}>Select nutrient to view progress:</Text>
+          <Text style={styles.sectionSubtitle}>
+            Select nutrient to view progress:
+          </Text>
           <View style={styles.nutrientButtonsRow}>
             {userGoalNutrients.map((nutrient) => (
               <TouchableOpacity
@@ -429,21 +589,51 @@ const MyProgressScreen: React.FC = () => {
           </View>
           {trendPoints.length > 0 && (
             <View style={{ marginTop: 16 }}>
-              <Text style={{ fontWeight: '600', marginBottom: 6, color: '#333' }}>Weekly trend</Text>
+              <Text
+                style={{ fontWeight: "600", marginBottom: 6, color: "#333" }}
+              >
+                Weekly trend
+              </Text>
               {trendPoints.map((point, idx) => (
-                <View key={point.label} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ width: 80, fontSize: 12, color: '#555' }}>{point.label}</Text>
-                  <View style={{ flex: 1, height: 12, backgroundColor: '#e3f2fd', borderRadius: 6, marginHorizontal: 8 }}>
+                <View
+                  key={point.label}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <Text style={{ width: 80, fontSize: 12, color: "#555" }}>
+                    {point.label}
+                  </Text>
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 12,
+                      backgroundColor: "#e3f2fd",
+                      borderRadius: 6,
+                      marginHorizontal: 8,
+                    }}
+                  >
                     <View
                       style={{
-                        width: `${Math.min((point.value / Math.max(...trendPoints.map(p => p.value || 1))) * 100, 100)}%`,
+                        width: `${Math.min((point.value / Math.max(...trendPoints.map((p) => p.value || 1))) * 100, 100)}%`,
                         height: 12,
-                        backgroundColor: '#1976d2',
+                        backgroundColor: "#1976d2",
                         borderRadius: 6,
                       }}
                     />
                   </View>
-                  <Text style={{ width: 40, fontSize: 12, color: '#333', textAlign: 'right' }}>{point.value.toFixed(0)}</Text>
+                  <Text
+                    style={{
+                      width: 40,
+                      fontSize: 12,
+                      color: "#333",
+                      textAlign: "right",
+                    }}
+                  >
+                    {point.value.toFixed(0)}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -455,10 +645,15 @@ const MyProgressScreen: React.FC = () => {
           {/* Show all ingredients tried */}
           <View style={styles.optionRow}>
             <TouchableOpacity
-              style={[styles.checkbox, includeIngredientsInPdf && styles.checkboxChecked]}
+              style={[
+                styles.checkbox,
+                includeIngredientsInPdf && styles.checkboxChecked,
+              ]}
               onPress={() => setIncludeIngredientsInPdf((prev) => !prev)}
             >
-              {includeIngredientsInPdf && <Text style={styles.checkmark}>✓</Text>}
+              {includeIngredientsInPdf && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
             </TouchableOpacity>
             <Text style={styles.optionLabel}>Show all ingredients tried</Text>
           </View>
@@ -466,7 +661,10 @@ const MyProgressScreen: React.FC = () => {
           {/* Nutrient progress + ingredient selection */}
           <View style={styles.optionRow}>
             <TouchableOpacity
-              style={[styles.checkbox, includeNutrientInPdf && styles.checkboxChecked]}
+              style={[
+                styles.checkbox,
+                includeNutrientInPdf && styles.checkboxChecked,
+              ]}
               onPress={() => setIncludeNutrientInPdf((prev) => !prev)}
             >
               {includeNutrientInPdf && <Text style={styles.checkmark}>✓</Text>}
@@ -475,23 +673,35 @@ const MyProgressScreen: React.FC = () => {
           </View>
           {includeNutrientInPdf && (
             <View style={{ marginLeft: 32, marginBottom: 8 }}>
-              <Text style={styles.sectionSubtitle}>Select nutrients (multi-select):</Text>
+              <Text style={styles.sectionSubtitle}>
+                Select nutrients (multi-select):
+              </Text>
               <View style={styles.nutrientButtonsRow}>
                 {userGoalNutrients.map((nutrient) => {
                   const selected = selectedPdfNutrients.includes(nutrient);
                   return (
                     <TouchableOpacity
                       key={nutrient}
-                      style={selected ? styles.nutrientButtonSelected : styles.nutrientButton}
+                      style={
+                        selected
+                          ? styles.nutrientButtonSelected
+                          : styles.nutrientButton
+                      }
                       onPress={() => {
                         setSelectedPdfNutrients((prev) =>
                           prev.includes(nutrient)
                             ? prev.filter((n) => n !== nutrient)
-                            : [...prev, nutrient]
+                            : [...prev, nutrient],
                         );
                       }}
                     >
-                      <Text style={selected ? styles.nutrientButtonTextSelected : styles.nutrientButtonText}>
+                      <Text
+                        style={
+                          selected
+                            ? styles.nutrientButtonTextSelected
+                            : styles.nutrientButtonText
+                        }
+                      >
                         {nutrientLabels[nutrient]}
                       </Text>
                     </TouchableOpacity>
@@ -504,7 +714,10 @@ const MyProgressScreen: React.FC = () => {
           {/* Recipes liked */}
           <View style={styles.optionRow}>
             <TouchableOpacity
-              style={[styles.checkbox, includeRecipesLiked && styles.checkboxChecked]}
+              style={[
+                styles.checkbox,
+                includeRecipesLiked && styles.checkboxChecked,
+              ]}
               onPress={() => setIncludeRecipesLiked((prev) => !prev)}
             >
               {includeRecipesLiked && <Text style={styles.checkmark}>✓</Text>}
@@ -515,10 +728,15 @@ const MyProgressScreen: React.FC = () => {
           {/* Recipes disliked */}
           <View style={styles.optionRow}>
             <TouchableOpacity
-              style={[styles.checkbox, includeRecipesDisliked && styles.checkboxChecked]}
+              style={[
+                styles.checkbox,
+                includeRecipesDisliked && styles.checkboxChecked,
+              ]}
               onPress={() => setIncludeRecipesDisliked((prev) => !prev)}
             >
-              {includeRecipesDisliked && <Text style={styles.checkmark}>✓</Text>}
+              {includeRecipesDisliked && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
             </TouchableOpacity>
             <Text style={styles.optionLabel}>Recipes disliked</Text>
           </View>
@@ -526,7 +744,10 @@ const MyProgressScreen: React.FC = () => {
           {/* Total recipes */}
           <View style={styles.optionRow}>
             <TouchableOpacity
-              style={[styles.checkbox, includeTotalRecipes && styles.checkboxChecked]}
+              style={[
+                styles.checkbox,
+                includeTotalRecipes && styles.checkboxChecked,
+              ]}
               onPress={() => setIncludeTotalRecipes((prev) => !prev)}
             >
               {includeTotalRecipes && <Text style={styles.checkmark}>✓</Text>}
@@ -537,18 +758,34 @@ const MyProgressScreen: React.FC = () => {
           {/* Recipes re-added */}
           <View style={styles.optionRow}>
             <TouchableOpacity
-              style={[styles.checkbox, includeRepeatRecipesInPdf && styles.checkboxChecked]}
+              style={[
+                styles.checkbox,
+                includeRepeatRecipesInPdf && styles.checkboxChecked,
+              ]}
               onPress={() => setIncludeRepeatRecipesInPdf((prev) => !prev)}
             >
-              {includeRepeatRecipesInPdf && <Text style={styles.checkmark}>✓</Text>}
+              {includeRepeatRecipesInPdf && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
             </TouchableOpacity>
             <Text style={styles.optionLabel}>Recipes re-added</Text>
           </View>
         </View>
 
         {/* Optional: Show a plain text preview of the report (not HTML) */}
-        <View style={{ marginVertical: 16, backgroundColor: '#f0f4f8', borderRadius: 8, padding: 12 }}>
-          <Text style={{ fontFamily: 'monospace', fontSize: 13, color: '#333' }}>{buildReportPreview()}</Text>
+        <View
+          style={{
+            marginVertical: 16,
+            backgroundColor: "#f0f4f8",
+            borderRadius: 8,
+            padding: 12,
+          }}
+        >
+          <Text
+            style={{ fontFamily: "monospace", fontSize: 13, color: "#333" }}
+          >
+            {buildReportPreview()}
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.exportButton}
@@ -563,20 +800,20 @@ const MyProgressScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   ingredientSelectButton: {
-    backgroundColor: '#F0F4F8',
+    backgroundColor: "#F0F4F8",
     borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 16,
     marginTop: 8,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   ingredientSelectButtonText: {
-    color: '#333',
+    color: "#333",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   ingredientModal: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 20,
@@ -584,26 +821,26 @@ const styles = StyleSheet.create({
   },
   ingredientModalTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 12,
-    color: '#333',
+    color: "#333",
   },
   ingredientModalItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   ingredientModalItemText: {
     fontSize: 15,
-    color: '#333',
+    color: "#333",
   },
   ingredientModalCancel: {
     marginTop: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   ingredientModalCancelText: {
-    color: '#1976D2',
-    fontWeight: '700',
+    color: "#1976D2",
+    fontWeight: "700",
     fontSize: 15,
   },
   safeArea: {
