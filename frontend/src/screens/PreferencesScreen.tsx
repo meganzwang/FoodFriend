@@ -1,3 +1,4 @@
+// ...existing code...
 // src/screens/PreferencesScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
@@ -9,6 +10,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -38,12 +41,13 @@ interface PreferencesScreenProps {
   navigation: PreferencesScreenNavigationProp;
 }
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({
+const SectionHeader: React.FC<{ title: string; subtitle?: string; color?: string }> = ({
   title,
   subtitle,
+  color,
 }) => (
   <View style={styles.sectionHeader}>
-    <Text style={styles.sectionHeaderText}>{title}</Text>
+    <Text style={[styles.sectionHeaderText, color ? { color } : null]}>{title}</Text>
     {subtitle && <Text style={styles.sectionSubtitleText}>{subtitle}</Text>}
   </View>
 );
@@ -257,19 +261,23 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>{'←'}</Text>
-        </TouchableOpacity>
-        <Text style={styles.titleHeader}>Preferences</Text>
-      </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Your Preferences</Text>
-      
 
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+      >
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Text style={styles.backButtonText}>{'←'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.titleHeader}>Your Preferences</Text>
+        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <SectionHeader
           title="Allergies & Intolerances"
+          color="#D32F2F"
         />
         <MultiSelectGroup
           options={INTOLERANCES}
@@ -288,6 +296,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           onToggle={(val) => toggleSelection("liked_flavors", val)}
         />
 
+
         <SectionHeader
           title="Favorite Textures"
           subtitle="Mouthfeels I enjoy"
@@ -298,19 +307,38 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           onToggle={(val) => toggleSelection("liked_textures", val)}
         />
 
+        <SectionHeader
+          title="Goals to Increase"
+          subtitle="Nutrients to get more of"
+        />
+        <MultiSelectGroup
+          options={NUTRIENT_GOALS}
+          selected={preferences.increase_goals}
+          onToggle={(val) => toggleSelection("increase_goals", val)}
+        />
+
+        <SectionHeader
+          title="Goals to Decrease"
+          subtitle="Nutrients to limit"
+          color="#D32F2F"
+        />
+        <MultiSelectGroup
+          options={NUTRIENT_GOALS}
+          selected={preferences.decrease_goals}
+          onToggle={(val) => toggleSelection("decrease_goals", val)}
+          activeColor="#D32F2F"
+        />
+
         <View style={styles.aversionContainer}>
-          <SectionHeader
-            title="Things I don't like"
-            subtitle="I'd prefer to see fewer of these"
-          />
-          <Text style={styles.aversionLabel}>Flavors to limit:</Text>
+          <SectionHeader title="Things I don't like" subtitle="I'd prefer to see fewer of these" color="#D32F2F" />
+          <Text style={[styles.aversionLabel, { color: '#D32F2F' }]}>Flavors to limit:</Text>
           <MultiSelectGroup
             options={FLAVORS}
             selected={preferences.disliked_flavors}
             onToggle={(val) => toggleSelection("disliked_flavors", val)}
             activeColor="#D32F2F"
           />
-          <Text style={[styles.aversionLabel, { marginTop: 12 }]}>
+          <Text style={[styles.aversionLabel, { marginTop: 12, color: '#D32F2F' }]}> 
             Textures to limit:
           </Text>
           <MultiSelectGroup
@@ -321,8 +349,11 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           />
         </View>
 
+        {/* Add extra space between Preferred and Disliked Foods */}
+        <View style={{ height: 32 }} />
+
         <SectionHeader title="Preferred Foods" />
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, filteredPreferred.length > 0 && { marginBottom: 32 }]}> 
           <TextInput
             style={styles.searchInput}
             placeholder="Search preferred foods..."
@@ -331,18 +362,20 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           />
           {filteredPreferred.length > 0 && (
             <View style={styles.resultsContainer}>
-              {filteredPreferred.map((ing) => (
-                <TouchableOpacity
-                  key={ing}
-                  style={styles.resultItem}
-                  onPress={() => {
-                    toggleSelection("preferred_foods", ing);
-                    setPreferredSearch("");
-                  }}
-                >
-                  <Text>{ing}</Text>
-                </TouchableOpacity>
-              ))}
+              <ScrollView nestedScrollEnabled={true} style={{maxHeight: 135}}>
+                {filteredPreferred.map((ing) => (
+                  <TouchableOpacity
+                    key={ing}
+                    style={styles.resultItem}
+                    onPress={() => {
+                      toggleSelection("preferred_foods", ing);
+                      setPreferredSearch("");
+                    }}
+                  >
+                    <Text numberOfLines={1} ellipsizeMode="tail" style={{width: '100%'}}>{ing}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
         </View>
@@ -357,15 +390,15 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
               ]}
               onPress={() => toggleSelection("preferred_foods", ing)}
             >
-              <Text style={[styles.selectedChipText, { color: "#2E7D32" }]}>
+              <Text style={[styles.selectedChipText, { color: "#2E7D32" }]}> 
                 {ing} ✕
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <SectionHeader title="Disliked Foods" />
-        <View style={styles.searchContainer}>
+        <SectionHeader title="Disliked Foods" color="#D32F2F" />
+        <View style={[styles.searchContainer, filteredDisliked.length > 0 && { marginBottom: 32 }]}> 
           <TextInput
             style={styles.searchInput}
             placeholder="Search ingredients to avoid..."
@@ -374,18 +407,20 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           />
           {filteredDisliked.length > 0 && (
             <View style={styles.resultsContainer}>
-              {filteredDisliked.map((ing) => (
-                <TouchableOpacity
-                  key={ing}
-                  style={styles.resultItem}
-                  onPress={() => {
-                    toggleSelection("disliked_foods", ing);
-                    setDislikeSearch("");
-                  }}
-                >
-                  <Text>{ing}</Text>
-                </TouchableOpacity>
-              ))}
+              <ScrollView nestedScrollEnabled={true} style={{maxHeight: 135}}>
+                {filteredDisliked.map((ing) => (
+                  <TouchableOpacity
+                    key={ing}
+                    style={styles.resultItem}
+                    onPress={() => {
+                      toggleSelection("disliked_foods", ing);
+                      setDislikeSearch("");
+                    }}
+                  >
+                    <Text numberOfLines={1} ellipsizeMode="tail" style={{width: '100%'}}>{ing}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
         </View>
@@ -403,18 +438,6 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
         </View>
 
         <TouchableOpacity
-          style={styles.saveButton}
-          onPress={() => savePreferences(false)}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Preferences</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[
             styles.saveButton,
             { backgroundColor: "#2196F3", marginTop: 12 },
@@ -422,9 +445,14 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           onPress={() => savePreferences(true)}
           disabled={isSaving}
         >
-          <Text style={styles.saveButtonText}>Continue to App</Text>
+          {isSaving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Continue to App</Text>
+          )}
         </TouchableOpacity>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -434,7 +462,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 6,
-    marginTop: 8,
+    // marginTop: 8, // Removed to prevent header cut-off by notch; SafeAreaView handles spacing
   },
   backButton: {
     marginRight: 10,
@@ -486,7 +514,7 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#4CAF50",
+    color: "#388E3C", // default green for section headers
   },
   sectionSubtitleText: {
     fontSize: 12,
@@ -554,11 +582,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    maxHeight: 200,
-    position: "absolute",
-    top: 50,
-    left: 0,
-    right: 0,
+    maxHeight: 135, // Show ~3 items (3 * 45px)
+    position: "relative",
     zIndex: 1000,
     elevation: 5,
     shadowColor: "#000",
@@ -570,6 +595,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
+    minHeight: 45,
+    justifyContent: "center",
   },
   selectedIngredients: {
     flexDirection: "row",

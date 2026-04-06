@@ -45,6 +45,13 @@ const AllTriedRecipesScreen: React.FC = () => {
     load();
   }, []);
 
+
+  // Calculate unique ingredients for variety summary
+  const uniqueIngredients = useMemo(() => {
+    const allIngredients = recipes.flatMap((r) => r.ingredients || []);
+    return Array.from(new Set(allIngredients.map((i) => i.toLowerCase())));
+  }, [recipes]);
+
   const filteredRecipes = useMemo(() => {
     if (filter === "all") return recipes;
     return recipes.filter((recipe) => recipe.feedbackType === filter);
@@ -145,6 +152,7 @@ const AllTriedRecipesScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>All Tried Recipes</Text>
+
 
       <View style={styles.filterRow}>
         <TouchableOpacity
@@ -280,6 +288,12 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 20,
+  },
+  varietySummary: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   emptyText: {
     textAlign: "center",

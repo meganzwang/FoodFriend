@@ -473,10 +473,17 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
                   <Text style={styles.thumbEmoji}>👎</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.tellUsMoreButton}
-                  onPress={() => openTellUsMore(recipe)}
+                  style={[
+                    styles.tellUsMoreButton,
+                    !feedback?.type && styles.tellUsMoreButtonDisabled,
+                  ]}
+                  onPress={() => feedback?.type ? openTellUsMore(recipe) : null}
+                  disabled={!feedback?.type}
                 >
-                  <Text style={styles.tellUsMoreText}>Tell us more</Text>
+                  <Text style={[
+                    styles.tellUsMoreText,
+                    !feedback?.type && styles.tellUsMoreTextDisabled,
+                  ]}>Tell us more</Text>
                 </TouchableOpacity>
               </View>
 
@@ -523,6 +530,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 6,
+    // marginTop intentionally omitted for alignment with other screens
   },
   backButton: {
     marginRight: 10,
@@ -651,8 +659,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#1976D2",
     alignItems: "center",
   },
+  tellUsMoreButtonDisabled: {
+    backgroundColor: "#E0E0E0",
+  },
   tellUsMoreText: {
     color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  tellUsMoreTextDisabled: {
+    color: "#888",
     fontWeight: "700",
     fontSize: 13,
   },

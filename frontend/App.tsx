@@ -112,12 +112,12 @@ export default function App() {
         <Stack.Screen
           name="Goals"
           component={GoalsScreen}
-          options={{ title: "Your Goals" }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Preferences"
           component={PreferencesScreen}
-          options={{ title: "My Preferences" }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="RecipeFeedback"

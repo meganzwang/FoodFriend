@@ -231,9 +231,9 @@ def process_ingredient_threadsafe(ingredient):
 # Main function
 # -----------------------------
 def main():
-    # Load CSV
-    df = pd.read_csv("data/raw_ingredients.csv")
-    print(f"📋 Processing {len(df)} ingredients...\n")
+    # Load cleaned restricted ingredients CSV
+    df = pd.read_csv("data/restricted_ingredients_clean.csv")
+    print(f"📋 Processing {len(df)} ingredients from restricted_ingredients_clean.csv...\n")
 
     allergens_list = []
     diet_list = []
@@ -261,9 +261,9 @@ def main():
     df["allergens"] = allergens_list
     df["diet"] = diet_list
 
-    # Save labeled CSV
-    df.to_csv("restricted_ingredients_labeled.csv", index=False)
-    print(f"\n✅ Done! Labeled {len(df)} ingredients.")
+    # Save labeled CSV with new name
+    df.to_csv("data/final_restricted_ingredients_clean.csv", index=False)
+    print(f"\n✅ Done! Labeled {len(df)} ingredients and saved to final_restricted_ingredients_clean.csv.")
 
     # Save cache for future runs
     with open(CACHE_FILE, "wb") as f:
