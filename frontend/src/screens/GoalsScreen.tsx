@@ -30,43 +30,53 @@ interface GoalsScreenProps {
 const STORAGE_KEY = "@user_preferences";
 const USER_ID_KEY = "@food_friend_user_id";
 
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+const SectionHeader: React.FC<{ title: string; color?: string }> = ({ title, color }) => (
   <View style={styles.sectionHeader}>
-    <Text style={styles.sectionHeaderText}>{title}</Text>
+    <Text style={[styles.sectionHeaderText, color ? { color } : null]}>{title}</Text>
   </View>
 );
 
-const MultiSelectGroup: React.FC<{
+interface MultiSelectGroupProps {
   options: string[];
   selected: string[];
   onToggle: (option: any) => void;
-}> = ({ options, selected, onToggle }) => (
+  disabledOptions?: string[];
+}
+
+const MultiSelectGroup: React.FC<MultiSelectGroupProps & { activeColor?: string }> = ({ options, selected, onToggle, disabledOptions = [], activeColor = "#4CAF50" }) => (
   <View style={styles.groupContainer}>
-    {options.map((option) => (
-      <TouchableOpacity
-        key={option}
-        style={[
-          styles.chip,
-          (selected || []).includes(option) && styles.chipSelected,
-        ]}
-        onPress={() => onToggle(option)}
-      >
-        <Text
+    {options.map((option) => {
+      const isSelected = (selected || []).includes(option);
+      const isDisabled = (disabledOptions || []).includes(option);
+      return (
+        <TouchableOpacity
+          key={option}
           style={[
-            styles.chipText,
-            (selected || []).includes(option) && styles.chipTextSelected,
+            styles.chip,
+            isSelected && { backgroundColor: activeColor, borderColor: activeColor },
+            isDisabled && { opacity: 0.4 },
           ]}
+          onPress={() => !isDisabled && onToggle(option)}
+          disabled={isDisabled}
         >
-          {option.replace(/_/g, " ")}
-        </Text>
-      </TouchableOpacity>
-    ))}
+          <Text
+            style={[
+              styles.chipText,
+              isSelected && { color: '#fff', fontWeight: '500' },
+              isDisabled && { color: '#888' },
+            ]}
+          >
+            {option.replace(/_/g, " ")}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
   </View>
 );
 
 const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   const handleBack = () => {
-    navigation.navigate("Welcome");
+    navigation.goBack();
   };
   const [preferences, setPreferences] = useState<UserPreferences>({
     intolerances: [],
@@ -177,15 +187,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backButtonText}>{'←'}</Text>
         </TouchableOpacity>
-        <Text style={styles.titleHeader}>Goals</Text>
+        <Text style={styles.titleHeader}>What are your goals?</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>What are your goals?</Text>
       
 
         <SectionHeader title="Diet" />
@@ -199,25 +209,24 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
         <Text style={styles.helperText}>
           Select nutrients you want to consume more of.
         </Text>
+
         <MultiSelectGroup
           options={NUTRIENT_GOALS}
           selected={preferences.increase_goals}
           onToggle={(val) => toggleSelection("increase_goals", val)}
+          disabledOptions={preferences.decrease_goals}
         />
 
-        <SectionHeader title="Goals to Decrease" />
-        <Text style={styles.helperText}>
-          Select nutrients you want to limit.
-        </Text>
+        <SectionHeader title="Goals to Decrease" color="#D32F2F" />
+        <Text style={[styles.helperText, { color: '#D32F2F' }]}>Select nutrients you want to limit.</Text>
+
         <MultiSelectGroup
           options={NUTRIENT_GOALS}
           selected={preferences.decrease_goals}
           onToggle={(val) => toggleSelection("decrease_goals", val)}
+          disabledOptions={preferences.increase_goals}
+          activeColor="#D32F2F"
         />
-
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveGoals}>
-          <Text style={styles.saveButtonText}>Save Goals</Text>
-        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.continueButton}
@@ -235,7 +244,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 6,
-    marginTop: 8,
+    // marginTop: 8, // Removed to prevent header cut-off by notch; SafeAreaView handles spacing
   },
   backButton: {
     marginRight: 10,

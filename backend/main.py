@@ -1,6 +1,139 @@
+import matplotlib.pyplot as plt
+import io
+# PDF and image generation
+import base64
+import os
+import pandas as pd
+from fpdf import FPDF
+import tempfile
+# ─── Nutrient Progress Plot ───────────────────────────────────────────────────
+
+def get_week_start(dt):
+    # Returns the Monday of the week for a datetime
+    return dt - datetime.timedelta(days=dt.weekday())
+
+def aggregate_nutrient_progress(user_id):
+    """
+    Returns a DataFrame with index=week_start, columns=nutrients, values=average per meal per week.
+    """
+    conn = get_db()
+    try:
+        # Get all selected recipes for user, with timestamps and nutrients
+        rows = conn.execute(
+            """
+            SELECT r.selected_at, r.calories, r.protein, r.fat, r.sodium, r.fiber, r.sugar, r.saturated_fat, r.iron
+            FROM recommended_recipes r
+            JOIN recommendation_runs run ON r.run_id = run.run_id
+            WHERE r.user_id = ? AND r.was_selected = 1 AND r.selected_at IS NOT NULL
+            ORDER BY r.selected_at ASC
+            """,
+            (user_id,)
+        ).fetchall()
+        if not rows:
+            return None
+        # Build DataFrame
+        df = pd.DataFrame(rows, columns=[desc[0] for desc in conn.execute('PRAGMA table_info(recommended_recipes)').fetchall() if desc[1] in ['selected_at','calories','protein','fat','sodium','fiber','sugar','saturated_fat','iron']])
+        # Parse dates
+        df['selected_at'] = pd.to_datetime(df['selected_at'])
+        df['week_start'] = df['selected_at'].dt.to_period('W').apply(lambda r: r.start_time)
+        # Convert nutrients to float
+        nutrient_cols = ['calories','protein','fat','sodium','fiber','sugar','saturated_fat','iron']
+        for col in nutrient_cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        # Group by week, compute mean per meal per week
+        weekly = df.groupby('week_start')[nutrient_cols].mean()
+        return weekly
+    finally:
+        conn.close()
+
+def plot_nutrient_progress(weekly_df):
+    """
+    Returns a PNG image (bytes) of the nutrient progress plot.
+    """
+    plt.figure(figsize=(10,6))
+    for col in weekly_df.columns:
+        plt.plot(weekly_df.index, weekly_df[col], marker='o', label=col.capitalize())
+    plt.xlabel('Week')
+    plt.ylabel('Average per Meal')
+    plt.title('Average Nutrient per Meal per Week')
+    plt.legend()
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    return buf.read()
+
+# New: PDF report generation with nutrient plot
+def generate_pdf_report(user_id, selected_nutrients=None):
+    weekly = aggregate_nutrient_progress(user_id)
+    if weekly is None or weekly.empty:
+        return None, "No data available for this user."
+    # Filter to selected nutrients if provided
+    if selected_nutrients:
+        filtered = [n for n in selected_nutrients if n in weekly.columns]
+        if filtered:
+            weekly = weekly[filtered]
+    # Generate plot image
+    img_bytes = plot_nutrient_progress(weekly)
+    # Save image to temp file for fpdf
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_img:
+        tmp_img.write(img_bytes)
+        img_path = tmp_img.name
+    # Create PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, 'Nutrient Progress Report', ln=1, align='C')
+    pdf.set_font('Arial', '', 12)
+    pdf.cell(0, 10, f'User ID: {user_id}', ln=1)
+    pdf.ln(5)
+    pdf.cell(0, 10, 'Average nutrient per meal per week:', ln=1)
+    pdf.image(img_path, x=10, y=40, w=pdf.w-20)
+    # Clean up temp image
+    try:
+        os.remove(img_path)
+    except Exception:
+        pass
+    # Output PDF as bytes
+    pdf_bytes = pdf.output(dest='S').encode('latin1')
+    return pdf_bytes, None
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/api/users/{user_id}/nutrient-progress-plot")
+async def get_nutrient_progress_plot(user_id: str):
+    """
+    Returns a PNG plot of average nutrient per meal per week for the user.
+    """
+    weekly = aggregate_nutrient_progress(user_id)
+    if weekly is None or weekly.empty:
+        return {"error": "No data available for this user."}
+    img_bytes = plot_nutrient_progress(weekly)
+    b64 = base64.b64encode(img_bytes).decode('utf-8')
+    return {"image_base64": b64, "nutrients": list(weekly.columns), "weeks": [str(w) for w in weekly.index]}
+
+# New: PDF report endpoint
+from fastapi import Response
+from fastapi.responses import StreamingResponse
+from fastapi import Body
+
+@app.post("/api/users/{user_id}/nutrient-progress-report-pdf")
+async def get_nutrient_progress_report_pdf(user_id: str, body: dict = Body(...)):
+    """
+    Returns a PDF report with the nutrient progress plot for selected nutrients.
+    Body: {"nutrients": ["calories", "protein", ...]}
+    """
+    selected_nutrients = body.get("nutrients")
+    pdf_bytes, error = generate_pdf_report(user_id, selected_nutrients)
+    if error:
+        return {"error": error}
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=nutrient_progress_{user_id}.pdf"})
+
 # backend/main.py
 import csv
-import os
 import json
 import re
 import socket

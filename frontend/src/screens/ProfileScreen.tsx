@@ -95,91 +95,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
       {/* User identity card */}
       {userId && (
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: "#E8F5E9",
-              borderColor: "#A5D6A7",
-              borderWidth: 1,
-            },
-          ]}
-        >
-          <Text style={styles.cardTitle}>👋 {userName || "Your Account"}</Text>
-          <Text style={styles.detailText}>
-            <Text style={styles.label}>Your ID: </Text>
-            {userId}
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: "#888",
-              marginTop: 4,
-              marginBottom: 10,
-            }}
-          >
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>User ID</Text>
+          <Text style={{ fontSize: 16, color: "#333", marginBottom: 4 }}>{userId}</Text>
+          <Text style={{ fontSize: 12, color: "#888", marginTop: 4, marginBottom: 10 }}>
             Share this ID to log in on another device.
           </Text>
           <Button title="Log Out" onPress={handleLogOut} color="#D32F2F" />
         </View>
       )}
 
-      {patientData ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>EHR Connection Status</Text>
-          <Text style={styles.detailText}>
-            <Text style={styles.label}>Patient Name:</Text>{" "}
-            {patientData.name || "N/A"}
-          </Text>
-          <Text style={styles.detailText}>
-            <Text style={styles.label}>Patient ID:</Text>{" "}
-            {patientData.patientId || "N/A"}
-          </Text>
-          {/* Add more patient data fields as needed */}
-
-          <Text style={styles.fhirDataTitle}>
-            FHIR Data Overview (Placeholder)
-          </Text>
-          {patientData.fhirData && (
-            <>
-              <Text style={styles.detailText}>
-                <Text style={styles.label}>Allergies:</Text>{" "}
-                {patientData.fhirData.allergies?.length || 0}
-              </Text>
-              <Text style={styles.detailText}>
-                <Text style={styles.label}>Conditions:</Text>{" "}
-                {patientData.fhirData.conditions?.length || 0}
-              </Text>
-              <Text style={styles.detailText}>
-                <Text style={styles.label}>Medications:</Text>{" "}
-                {patientData.fhirData.medications?.length || 0}
-              </Text>
-              <Text style={styles.detailText}>
-                <Text style={styles.label}>Observations:</Text>{" "}
-                {patientData.fhirData.observations?.length || 0}
-              </Text>
-            </>
-          )}
-
-          <Button
-            title="Disconnect EHR"
-            onPress={handleDisconnectEHR}
-            color="red"
-          />
-        </View>
-      ) : (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>EHR Not Connected</Text>
-          <Text style={styles.detailText}>
-            Connect your Electronic Health Record to get personalized, medically
-            informed food recommendations.
-          </Text>
-          <Button
-            title="Connect EHR"
-            onPress={() => navigation.navigate("EHRLogin")}
-          />
-        </View>
-      )}
+      {/* EHR/SMART/FHIR UI removed as requested */}
 
       {/* Placeholder for other profile settings */}
       <View style={styles.card}>

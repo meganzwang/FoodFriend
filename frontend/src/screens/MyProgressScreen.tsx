@@ -281,59 +281,44 @@ const MyProgressScreen: React.FC = () => {
     return result;
   }, [selectedPdfNutrients, triedRecipes]);
 
+  // Only use HTML for PDF generation, not for rendering in JSX
   const buildReportHtml = () => {
-    const sections: string[] = [];
-    sections.push(`<h1>FoodFriend Progress Report</h1>`);
-    sections.push(`<p>Generated on ${new Date().toLocaleDateString()}</p>`);
+    // ...existing code for PDF HTML...
+    // (leave as is, only used for Print.printToFileAsync)
+    // Do not render this HTML in JSX!
+    // If you want a preview, use a plain text summary below.
+    // (No changes needed here for PDF generation)
+  };
 
-    // Ingredients tried
+  // Add a plain text preview for the report (optional, not HTML)
+  const buildReportPreview = () => {
+    let preview = 'FoodFriend Progress Report\n';
+    preview += `Generated on ${new Date().toLocaleDateString()}\n`;
     if (includeIngredientsInPdf) {
-      sections.push(`<h2>New ingredients you have tried</h2>`);
+      preview += `New ingredients tried: ${uniqueIngredients.length}\n`;
       if (uniqueIngredients.length > 0) {
-        sections.push(`<p>${uniqueIngredients.length} unique ingredients tried.</p>`);
-        sections.push(`<p>${uniqueIngredients.slice(0, 20).join(", ")}${uniqueIngredients.length > 20 ? ", ..." : ""}</p>`);
+        preview += uniqueIngredients.slice(0, 20).join(", ") + (uniqueIngredients.length > 20 ? ", ..." : "") + '\n';
       } else {
-        sections.push(`<p>No ingredient history available yet.</p>`);
+        preview += 'No ingredient history available yet.\n';
       }
     }
-
-    // Nutrient progress and ingredient trend
     if (includeNutrientInPdf) {
-      sections.push(`<h2>Nutrient Progress</h2>`);
+      preview += 'Nutrient Progress:\n';
       selectedPdfNutrients.forEach((nutrient) => {
         const avg = selectedPdfNutrientAverages[nutrient] ?? 0;
-        sections.push(`<p>Average <strong>${nutrientLabels[nutrient]}</strong> per meal: <strong>${avg.toFixed(0)}</strong></p>`);
+        preview += `  ${nutrientLabels[nutrient]}: ${avg.toFixed(0)} ${nutrientUnits[nutrient]} per meal\n`;
       });
     }
-
-
-    // Comprehensive summary for recipes
     if (includeRecipesLiked || includeRecipesDisliked || includeTotalRecipes || includeRepeatRecipesInPdf) {
       const liked = triedRecipes.filter(r => r.feedbackType === "liked");
       const disliked = triedRecipes.filter(r => r.feedbackType === "disliked");
       const total = triedRecipes.length;
       const readded = repeatRecipeTitles.length;
-      sections.push(`<h2>Recipes Tried</h2>`);
-      sections.push(`<p>${total} total &mdash; ${liked.length} liked, ${disliked.length} disliked, ${readded} re-added to this week's plan.</p>`);
-      if (liked.length > 0) {
-        sections.push(`<strong>Liked:</strong> <ul>`);
-        liked.forEach(r => sections.push(`<li>${r.title}</li>`));
-        sections.push(`</ul>`);
-      }
-      if (disliked.length > 0) {
-        sections.push(`<strong>Disliked:</strong> <ul>`);
-        disliked.forEach(r => sections.push(`<li>${r.title}</li>`));
-        sections.push(`</ul>`);
-      }
-      if (readded > 0) {
-        sections.push(`<strong>Re-added:</strong> <ul>`);
-        repeatRecipeTitles.forEach((title) => {
-          sections.push(`<li>${title}</li>`);
-        });
-        sections.push(`</ul>`);
-      }
+      preview += `Recipes Tried: ${total} total, ${liked.length} liked, ${disliked.length} disliked, ${readded} re-added.\n`;
+      if (liked.length > 0) preview += '  Liked: ' + liked.map(r => r.title).join(", ") + '\n';
+      if (disliked.length > 0) preview += '  Disliked: ' + disliked.map(r => r.title).join(", ") + '\n';
+      if (readded > 0) preview += '  Re-added: ' + repeatRecipeTitles.join(", ") + '\n';
     }
-
     if (
       !includeIngredientsInPdf &&
       !includeNutrientInPdf &&
@@ -342,32 +327,9 @@ const MyProgressScreen: React.FC = () => {
       !includeTotalRecipes &&
       !includeRepeatRecipesInPdf
     ) {
-      sections.push(`<p>No report options selected. Please enable content before generating the PDF.</p>`);
+      preview += 'No report options selected. Please enable content before generating the PDF.';
     }
-
-    return `<!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>FoodFriend Progress Report</title>
-        <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #222; background: #f8fafc; }
-          h1 { color: #2d6cdf; margin-bottom: 0.5em; }
-          h2 { color: #222; margin-top: 1.5em; margin-bottom: 0.5em; }
-          ul { padding-left: 20px; }
-          li { margin-bottom: 8px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th, td { border: 1px solid #e0e0e0; padding: 8px; text-align: left; }
-          th { background: #e3f2fd; color: #1976d2; }
-          td { background: #fff; }
-          strong { color: #222; }
-          p { margin: 0.5em 0; }
-        </style>
-      </head>
-      <body>
-        ${sections.join("")}
-      </body>
-      </html>`;
+    return preview;
   };
 
   const handleGeneratePDF = async () => {
@@ -584,6 +546,10 @@ const MyProgressScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Optional: Show a plain text preview of the report (not HTML) */}
+        <View style={{ marginVertical: 16, backgroundColor: '#f0f4f8', borderRadius: 8, padding: 12 }}>
+          <Text style={{ fontFamily: 'monospace', fontSize: 13, color: '#333' }}>{buildReportPreview()}</Text>
+        </View>
         <TouchableOpacity
           style={styles.exportButton}
           onPress={handleGeneratePDF}

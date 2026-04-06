@@ -31,6 +31,7 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
   const [rankedIngredients, setRankedIngredients] = useState<any[]>([]);
   const [filteredOut, setFilteredOut] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRankings();
@@ -80,35 +81,21 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
             } else {
               setRankedIngredients((data.ranked || []).slice(0, 5));
               setFilteredOut(data.filtered || []);
-            }
-          } catch (parseError) {
-            console.error(
-              "[IngredientRankScreen] JSON Parse Error:",
-              parseError,
+                      setError(data.error);
+                      Alert.alert("Ranking Error", data.error);
             );
             console.error(
               "[IngredientRankScreen] Failed to parse string as JSON:",
+                      setError(null);
               responseText,
             );
-          }
-        } else {
-          console.warn(
-            "[IngredientRankScreen] Server returned status:",
-            response.status,
-          );
-        }
-      }
+                    setError("Failed to parse server response. Please try again later.");
     } catch (e: any) {
       console.error("[IngredientRankScreen] Network or other error:", e);
-      if (e.name === "AbortError") {
-        console.warn("[IngredientRankScreen] Request timed out");
-      }
-    } finally {
+                  setError(`Server returned status: ${response.status}`);
       setLoading(false);
     }
-  };
-
-  if (loading) {
+                setError("Network or server error. Please try again later.");
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -123,6 +110,17 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
         <Text style={styles.title}>Your Personalized Rankings</Text>
         <Text style={styles.subtitle}>
           Based on your goals and preferences, here is how we rank our test
+            // Show error if present
+            if (error) {
+              return (
+                <View style={styles.centered}>
+                  <Text style={{ color: 'red', fontSize: 16, textAlign: 'center', margin: 16 }}>{error}</Text>
+                  <TouchableOpacity onPress={fetchRankings} style={styles.continueButton}>
+                    <Text style={styles.continueButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            }
           ingredients:
         </Text>
 
