@@ -7,11 +7,12 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { Recipe } from "../../types";
-
-const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+import {
+  getCurrentUserId,
+  loadWeeklySelectedRecipes,
+} from "../utils/weeklySelectedRecipes";
 
 const GroceryListScreen: React.FC = () => {
   const [selectedRecipes, setSelectedRecipes] = useState<Recipe[]>([]);
@@ -20,9 +21,9 @@ const GroceryListScreen: React.FC = () => {
   const loadSelectedRecipes = useCallback(async () => {
     setLoading(true);
     try {
-      const stored = await AsyncStorage.getItem(WEEKLY_SELECTED_RECIPES_KEY);
-      const recipes: Recipe[] = stored ? JSON.parse(stored) : [];
-      setSelectedRecipes(Array.isArray(recipes) ? recipes : []);
+      const currentUserId = await getCurrentUserId();
+      const recipes = await loadWeeklySelectedRecipes(currentUserId);
+      setSelectedRecipes(recipes);
     } catch (error) {
       console.warn("Unable to load weekly selected recipes", error);
       setSelectedRecipes([]);
@@ -57,9 +58,7 @@ const GroceryListScreen: React.FC = () => {
       }
     });
 
-    return Array.from(uniqueMap.values()).sort((a, b) =>
-      a.localeCompare(b),
-    );
+    return Array.from(uniqueMap.values()).sort((a, b) => a.localeCompare(b));
   }, [selectedRecipes]);
 
   if (loading) {
@@ -73,7 +72,9 @@ const GroceryListScreen: React.FC = () => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>This Week's Groceries</Text>
-      <Text style={styles.subtitle}>Ingredients from your selected recipes</Text>
+      <Text style={styles.subtitle}>
+        Ingredients from your selected recipes
+      </Text>
 
       {selectedRecipes.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -98,10 +99,15 @@ const GroceryListScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Selected Recipes</Text>
             {selectedRecipes.map((recipe) => (
-              <View key={`${recipe.id}-${recipe.title}`} style={styles.recipeRow}>
+              <View
+                key={`${recipe.id}-${recipe.title}`}
+                style={styles.recipeRow}
+              >
                 <Text style={styles.recipeName}>{recipe.title}</Text>
                 <Text style={styles.recipeMeta}>
-                  {recipe.readyInMinutes ? `${recipe.readyInMinutes} min` : "Time N/A"}
+                  {recipe.readyInMinutes
+                    ? `${recipe.readyInMinutes} min`
+                    : "Time N/A"}
                 </Text>
               </View>
             ))}
@@ -111,8 +117,8 @@ const GroceryListScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Grocery List</Text>
             {groceryItems.length === 0 ? (
               <Text style={styles.body}>
-                Selected recipes don’t include ingredient details yet.
-                Try selecting recipes that return ingredient lists.
+                Selected recipes don’t include ingredient details yet. Try
+                selecting recipes that return ingredient lists.
               </Text>
             ) : (
               groceryItems.map((item, index) => (
@@ -126,7 +132,10 @@ const GroceryListScreen: React.FC = () => {
         </>
       )}
 
-      <TouchableOpacity style={styles.refreshButton} onPress={loadSelectedRecipes}>
+      <TouchableOpacity
+        style={styles.refreshButton}
+        onPress={loadSelectedRecipes}
+      >
         <Text style={styles.refreshButtonText}>Refresh grocery list</Text>
       </TouchableOpacity>
     </ScrollView>

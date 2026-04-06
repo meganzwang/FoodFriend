@@ -26,6 +26,10 @@ import RecipeFeedbackModal from "../components/RecipeFeedbackModal";
 import { CONFIG } from "../config";
 import { CompositeNavigationProp } from "@react-navigation/native";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import {
+  loadWeeklySelectedRecipes,
+  saveWeeklySelectedRecipes,
+} from "../utils/weeklySelectedRecipes";
 
 type RecipeFeedbackRouteProp =
   | RouteProp<RootStackParamList, "RecipeFeedback">
@@ -51,7 +55,6 @@ interface RecipeFeedbackEntry {
 
 const STORAGE_KEY = "@user_preferences";
 const USER_ID_KEY = "@food_friend_user_id";
-const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
 const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
 
 type StoredUserPreferences = Partial<UserPreferences> & { user_id?: string };
@@ -86,23 +89,16 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
 
   useEffect(() => {
     const loadSelectedRecipes = async () => {
+      const currentUserId = await AsyncStorage.getItem(USER_ID_KEY);
+
       if (routedRecipes.length > 0) {
         setSelectedRecipes(routedRecipes);
-        await AsyncStorage.setItem(
-          WEEKLY_SELECTED_RECIPES_KEY,
-          JSON.stringify(routedRecipes),
-        );
+        await saveWeeklySelectedRecipes(routedRecipes, currentUserId);
         return;
       }
 
-      const stored = await AsyncStorage.getItem(WEEKLY_SELECTED_RECIPES_KEY);
-      if (stored) {
-        try {
-          setSelectedRecipes(JSON.parse(stored));
-        } catch (error) {
-          console.warn("Failed to parse weekly selected recipes");
-        }
-      }
+      const storedRecipes = await loadWeeklySelectedRecipes(currentUserId);
+      setSelectedRecipes(storedRecipes);
     };
 
     void loadSelectedRecipes();
@@ -146,10 +142,8 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
             setSelectedRecipes(updatedRecipes);
 
             // Update AsyncStorage
-            await AsyncStorage.setItem(
-              WEEKLY_SELECTED_RECIPES_KEY,
-              JSON.stringify(updatedRecipes),
-            );
+            const currentUserId = await AsyncStorage.getItem(USER_ID_KEY);
+            await saveWeeklySelectedRecipes(updatedRecipes, currentUserId);
 
             // Remove any feedback for this recipe
             setFeedbackByRecipe((prev) => {
@@ -387,11 +381,8 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
     <ScrollView contentContainerStyle={styles.container}>
       <SafeAreaView edges={["top"]} style={{ backgroundColor: "#F5F5F5" }}>
         <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBack}
-          >
-            <Text style={styles.backButtonText}>{'←'}</Text>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Text style={styles.backButtonText}>{"←"}</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Your Weekly Recipes</Text>
         </View>
@@ -477,13 +468,19 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
                     styles.tellUsMoreButton,
                     !feedback?.type && styles.tellUsMoreButtonDisabled,
                   ]}
-                  onPress={() => feedback?.type ? openTellUsMore(recipe) : null}
+                  onPress={() =>
+                    feedback?.type ? openTellUsMore(recipe) : null
+                  }
                   disabled={!feedback?.type}
                 >
-                  <Text style={[
-                    styles.tellUsMoreText,
-                    !feedback?.type && styles.tellUsMoreTextDisabled,
-                  ]}>Tell us more</Text>
+                  <Text
+                    style={[
+                      styles.tellUsMoreText,
+                      !feedback?.type && styles.tellUsMoreTextDisabled,
+                    ]}
+                  >
+                    Tell us more
+                  </Text>
                 </TouchableOpacity>
               </View>
 

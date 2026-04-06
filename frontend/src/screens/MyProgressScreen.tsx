@@ -15,10 +15,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { NUTRIENT_GOALS, TriedRecipe, UserPreferences } from "../../types";
+import {
+  NUTRIENT_GOALS,
+  Recipe,
+  TriedRecipe,
+  UserPreferences,
+} from "../../types";
+import {
+  getCurrentUserId,
+  loadWeeklySelectedRecipes,
+} from "../utils/weeklySelectedRecipes";
 
 const STORAGE_KEY = "@user_preferences";
-const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
 
 type StatisticType =
   | "new_foods_tried"
@@ -67,7 +75,7 @@ const nutrientUnits: Record<NutrientGoal, string> = {
 const MyProgressScreen: React.FC = () => {
   const [preferences, setPreferences] =
     useState<Partial<UserPreferences> | null>(null);
-  const [weeklyRecipes, setWeeklyRecipes] = useState<TriedRecipe[]>([]);
+  const [weeklyRecipes, setWeeklyRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReportStats, setSelectedReportStats] = useState<
     StatisticType[]
@@ -123,13 +131,14 @@ const MyProgressScreen: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [saved, weekly] = await Promise.all([
+        const [saved, currentUserId] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEY),
-          AsyncStorage.getItem(WEEKLY_SELECTED_RECIPES_KEY),
+          getCurrentUserId(),
         ]);
 
         if (saved) setPreferences(JSON.parse(saved));
-        if (weekly) setWeeklyRecipes(JSON.parse(weekly));
+        const weeklyRecipes = await loadWeeklySelectedRecipes(currentUserId);
+        setWeeklyRecipes(weeklyRecipes);
       } catch (error) {
         console.warn("Could not load progress data", error);
       } finally {

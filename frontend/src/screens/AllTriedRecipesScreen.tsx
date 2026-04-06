@@ -14,11 +14,15 @@ import { TriedRecipe, UserPreferences, Recipe } from "../../types";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types";
+import {
+  getCurrentUserId,
+  loadWeeklySelectedRecipes,
+  saveWeeklySelectedRecipes,
+} from "../utils/weeklySelectedRecipes";
 
 type FilterType = "all" | "liked" | "disliked";
 
 const STORAGE_KEY = "@user_preferences";
-const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
 
 type AllTriedRecipesNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -44,7 +48,6 @@ const AllTriedRecipesScreen: React.FC = () => {
 
     load();
   }, []);
-
 
   // Calculate unique ingredients for variety summary
   const uniqueIngredients = useMemo(() => {
@@ -111,19 +114,18 @@ const AllTriedRecipesScreen: React.FC = () => {
       }));
 
     try {
-      const existing = await AsyncStorage.getItem(WEEKLY_SELECTED_RECIPES_KEY);
-      const existingRecipes: Recipe[] = existing ? JSON.parse(existing) : [];
-      
+      const currentUserId = await getCurrentUserId();
+      const existingRecipes = await loadWeeklySelectedRecipes(currentUserId);
+
       // Merge, removing duplicates by ID
       const recipeMap = new Map<number, Recipe>();
       [...existingRecipes, ...selectedRecipes].forEach((recipe) => {
         recipeMap.set(recipe.id, recipe);
       });
 
-      await AsyncStorage.setItem(
-        WEEKLY_SELECTED_RECIPES_KEY,
-        JSON.stringify(Array.from(recipeMap.values())),
-      );
+      const mergedRecipes = Array.from(recipeMap.values());
+
+      await saveWeeklySelectedRecipes(mergedRecipes, currentUserId);
 
       navigation.reset({
         index: 0,
@@ -134,7 +136,7 @@ const AllTriedRecipesScreen: React.FC = () => {
               routes: [
                 {
                   name: "ThisWeekRecipes",
-                  params: { selectedRecipes: Array.from(recipeMap.values()) },
+                  params: { selectedRecipes: mergedRecipes },
                 },
               ],
             },
@@ -142,17 +144,13 @@ const AllTriedRecipesScreen: React.FC = () => {
         ],
       });
     } catch (error) {
-      Alert.alert(
-        "Error",
-        "Failed to add recipes. Please try again.",
-      );
+      Alert.alert("Error", "Failed to add recipes. Please try again.");
     }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>All Tried Recipes</Text>
-
 
       <View style={styles.filterRow}>
         <TouchableOpacity
@@ -238,7 +236,8 @@ const AllTriedRecipesScreen: React.FC = () => {
           onPress={handleAddToWeekly}
         >
           <Text style={styles.confirmButtonText}>
-            Add {selectedRecipeIds.length} Recipe{selectedRecipeIds.length > 1 ? "s" : ""} to This Week
+            Add {selectedRecipeIds.length} Recipe
+            {selectedRecipeIds.length > 1 ? "s" : ""} to This Week
           </Text>
         </TouchableOpacity>
       )}
@@ -291,8 +290,8 @@ const styles = StyleSheet.create({
   },
   varietySummary: {
     fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
+    color: "#333",
+    textAlign: "center",
     marginBottom: 10,
   },
   emptyText: {

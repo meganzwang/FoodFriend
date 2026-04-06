@@ -20,6 +20,17 @@ import { CONFIG } from "../config";
 
 const USER_ID_KEY = "@food_friend_user_id";
 const STORAGE_KEY = "@user_preferences";
+const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
+const PATIENT_DATA_KEY = "patientData";
+
+const USER_SCOPED_STORAGE_KEYS = [
+  USER_ID_KEY,
+  STORAGE_KEY,
+  PATIENT_DATA_KEY,
+  WEEKLY_SELECTED_RECIPES_KEY,
+  ACTIVE_RECOMMENDATION_RUN_KEY,
+];
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -36,6 +47,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [userId, setUserId] = useState("");
   const [isLoading, setIsLoading] = useState(true); // start true to check stored ID
   const [isSaving, setIsSaving] = useState(false);
+
+  const clearUserScopedStorage = async () => {
+    await AsyncStorage.multiRemove(USER_SCOPED_STORAGE_KEYS);
+  };
 
   // On mount: if there's already a stored user ID, skip straight to the app.
   useEffect(() => {
@@ -61,8 +76,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             navigation.replace("MainApp");
             return;
           }
-          // If not found (e.g. DB reset), clear stale ID and show login
-          await AsyncStorage.removeItem(USER_ID_KEY);
+          // If not found (e.g. DB reset), clear stale user session and show login
+          await clearUserScopedStorage();
         }
       } catch {
         // Network error — still let them log in manually
@@ -81,6 +96,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
     setIsSaving(true);
     try {
+      await clearUserScopedStorage();
+
       const res = await fetch(`${CONFIG.API_URL}/api/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,6 +154,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
     setIsSaving(true);
     try {
+      await clearUserScopedStorage();
+
       const res = await fetch(`${CONFIG.API_URL}/api/users/${trimmedId}`);
 
       if (res.status === 404) {

@@ -23,9 +23,9 @@ import {
   UserPreferences,
 } from "../../types";
 import { CONFIG } from "../config";
+import { saveWeeklySelectedRecipes } from "../utils/weeklySelectedRecipes";
 
 const STORAGE_KEY = "@user_preferences";
-const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
 const USER_ID_KEY = "@food_friend_user_id";
 const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
 const PAGE_SIZE = 5;
@@ -119,6 +119,8 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       selectedRecipeIds.includes(recipe.id),
     );
 
+    let resolvedUserId: string | undefined;
+
     try {
       const [saved, userIdFromKey, recommendationRunId] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEY),
@@ -127,7 +129,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       ]);
 
       const savedPrefs: StoredUserPreferences = saved ? JSON.parse(saved) : {};
-      const resolvedUserId = userIdFromKey || savedPrefs.user_id;
+      resolvedUserId = userIdFromKey || savedPrefs.user_id;
 
       if (recommendationRunId && resolvedUserId) {
         await fetch(
@@ -146,10 +148,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       console.warn("Could not sync selected recipes to backend history");
     }
 
-    await AsyncStorage.setItem(
-      WEEKLY_SELECTED_RECIPES_KEY,
-      JSON.stringify(selectedRecipes),
-    );
+    await saveWeeklySelectedRecipes(selectedRecipes, resolvedUserId);
     navigation.reset({
       index: 0,
       routes: [
@@ -209,7 +208,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       <SafeAreaView edges={["top"]} style={{ backgroundColor: "#f5f5f5" }}>
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backButtonText}>{'←'}</Text>
+            <Text style={styles.backButtonText}>{"←"}</Text>
           </TouchableOpacity>
           <Text style={styles.titleHeader}>Your Weekly Recommendations</Text>
         </View>
@@ -301,9 +300,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
               style={styles.continueButton}
               onPress={() => void handleContinueToFeedback()}
             >
-              <Text style={styles.continueButtonText}>
-                Continue
-              </Text>
+              <Text style={styles.continueButtonText}>Continue</Text>
             </TouchableOpacity>
           )}
         </ScrollView>

@@ -25,6 +25,17 @@ interface ProfileScreenProps {
 
 const STORAGE_KEY = "@user_preferences";
 const USER_ID_KEY = "@food_friend_user_id";
+const WEEKLY_SELECTED_RECIPES_KEY = "@weekly_selected_recipes";
+const ACTIVE_RECOMMENDATION_RUN_KEY = "@active_recommendation_run_id";
+const PATIENT_DATA_KEY = "patientData";
+
+const USER_SCOPED_STORAGE_KEYS = [
+  USER_ID_KEY,
+  STORAGE_KEY,
+  PATIENT_DATA_KEY,
+  WEEKLY_SELECTED_RECIPES_KEY,
+  ACTIVE_RECOMMENDATION_RUN_KEY,
+];
 
 interface PatientData {
   patientId: string;
@@ -71,12 +82,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   }, []);
 
   const handleDisconnectEHR = async () => {
-    await AsyncStorage.removeItem("patientData");
+    await AsyncStorage.removeItem(PATIENT_DATA_KEY);
     setPatientData(null);
   };
 
   const handleLogOut = async () => {
-    await AsyncStorage.multiRemove([USER_ID_KEY, STORAGE_KEY, "patientData"]);
+    await AsyncStorage.multiRemove(USER_SCOPED_STORAGE_KEYS);
     navigation.replace("Login");
   };
 
@@ -97,8 +108,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       {userId && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>User ID</Text>
-          <Text style={{ fontSize: 16, color: "#333", marginBottom: 4 }}>{userId}</Text>
-          <Text style={{ fontSize: 12, color: "#888", marginTop: 4, marginBottom: 10 }}>
+          <Text style={{ fontSize: 16, color: "#333", marginBottom: 4 }}>
+            {userId}
+          </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              color: "#888",
+              marginTop: 4,
+              marginBottom: 10,
+            }}
+          >
             Share this ID to log in on another device.
           </Text>
           <Button title="Log Out" onPress={handleLogOut} color="#D32F2F" />
