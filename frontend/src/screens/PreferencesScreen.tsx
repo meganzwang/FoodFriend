@@ -41,13 +41,15 @@ interface PreferencesScreenProps {
   navigation: PreferencesScreenNavigationProp;
 }
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string; color?: string }> = ({
-  title,
-  subtitle,
-  color,
-}) => (
+const SectionHeader: React.FC<{
+  title: string;
+  subtitle?: string;
+  color?: string;
+}> = ({ title, subtitle, color }) => (
   <View style={styles.sectionHeader}>
-    <Text style={[styles.sectionHeaderText, color ? { color } : null]}>{title}</Text>
+    <Text style={[styles.sectionHeaderText, color ? { color } : null]}>
+      {title}
+    </Text>
     {subtitle && <Text style={styles.sectionSubtitleText}>{subtitle}</Text>}
   </View>
 );
@@ -261,8 +263,10 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
   };
 
   return (
-
-    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom", "left", "right"]}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -270,44 +274,44 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
       >
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backButtonText}>{'←'}</Text>
+            <Text style={styles.backButtonText}>{"←"}</Text>
           </TouchableOpacity>
           <Text style={styles.titleHeader}>Your Preferences</Text>
         </View>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <SectionHeader
-          title="Allergies & Intolerances"
-          color="#D32F2F"
-        />
-        <MultiSelectGroup
-          options={INTOLERANCES}
-          selected={preferences.intolerances}
-          onToggle={(val) => toggleSelection("intolerances", val)}
-          activeColor="#D32F2F"
-        />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <SectionHeader title="Allergies & Intolerances" color="#D32F2F" />
+          <MultiSelectGroup
+            options={INTOLERANCES}
+            selected={preferences.intolerances}
+            onToggle={(val) => toggleSelection("intolerances", val)}
+            activeColor="#D32F2F"
+          />
 
-        <SectionHeader
-          title="Favorite Flavors"
-          subtitle="Tastes I usually look for"
-        />
-        <MultiSelectGroup
-          options={FLAVORS}
-          selected={preferences.liked_flavors}
-          onToggle={(val) => toggleSelection("liked_flavors", val)}
-        />
+          <SectionHeader
+            title="Favorite Flavors"
+            subtitle="Tastes I usually look for"
+          />
+          <MultiSelectGroup
+            options={FLAVORS}
+            selected={preferences.liked_flavors}
+            onToggle={(val) => toggleSelection("liked_flavors", val)}
+          />
 
+          <SectionHeader
+            title="Favorite Textures"
+            subtitle="Mouthfeels I enjoy"
+          />
+          <MultiSelectGroup
+            options={TEXTURES}
+            selected={preferences.liked_textures}
+            onToggle={(val) => toggleSelection("liked_textures", val)}
+          />
 
-        <SectionHeader
-          title="Favorite Textures"
-          subtitle="Mouthfeels I enjoy"
-        />
-        <MultiSelectGroup
-          options={TEXTURES}
-          selected={preferences.liked_textures}
-          onToggle={(val) => toggleSelection("liked_textures", val)}
-        />
-
-        <SectionHeader
+          {/* <SectionHeader
           title="Goals to Increase"
           subtitle="Nutrients to get more of"
         />
@@ -327,130 +331,169 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           selected={preferences.decrease_goals}
           onToggle={(val) => toggleSelection("decrease_goals", val)}
           activeColor="#D32F2F"
-        />
+        /> */}
 
-        <View style={styles.aversionContainer}>
-          <SectionHeader title="Things I don't like" subtitle="I'd prefer to see fewer of these" color="#D32F2F" />
-          <Text style={[styles.aversionLabel, { color: '#D32F2F' }]}>Flavors to limit:</Text>
-          <MultiSelectGroup
-            options={FLAVORS}
-            selected={preferences.disliked_flavors}
-            onToggle={(val) => toggleSelection("disliked_flavors", val)}
-            activeColor="#D32F2F"
-          />
-          <Text style={[styles.aversionLabel, { marginTop: 12, color: '#D32F2F' }]}> 
-            Textures to limit:
-          </Text>
-          <MultiSelectGroup
-            options={TEXTURES}
-            selected={preferences.disliked_textures}
-            onToggle={(val) => toggleSelection("disliked_textures", val)}
-            activeColor="#D32F2F"
-          />
-        </View>
-
-        {/* Add extra space between Preferred and Disliked Foods */}
-        <View style={{ height: 32 }} />
-
-        <SectionHeader title="Preferred Foods" />
-        <View style={[styles.searchContainer, filteredPreferred.length > 0 && { marginBottom: 32 }]}> 
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search preferred foods..."
-            value={preferredSearch}
-            onChangeText={setPreferredSearch}
-          />
-          {filteredPreferred.length > 0 && (
-            <View style={styles.resultsContainer}>
-              <ScrollView nestedScrollEnabled={true} style={{maxHeight: 135}}>
-                {filteredPreferred.map((ing) => (
-                  <TouchableOpacity
-                    key={ing}
-                    style={styles.resultItem}
-                    onPress={() => {
-                      toggleSelection("preferred_foods", ing);
-                      setPreferredSearch("");
-                    }}
-                  >
-                    <Text numberOfLines={1} ellipsizeMode="tail" style={{width: '100%'}}>{ing}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.selectedIngredients}>
-          {preferences.preferred_foods.map((ing) => (
-            <TouchableOpacity
-              key={ing}
+          <View style={styles.aversionContainer}>
+            <SectionHeader
+              title="Things I don't like"
+              subtitle="I'd prefer to see fewer of these"
+              color="#D32F2F"
+            />
+            <Text style={[styles.aversionLabel, { color: "#D32F2F" }]}>
+              Flavors to limit:
+            </Text>
+            <MultiSelectGroup
+              options={FLAVORS}
+              selected={preferences.disliked_flavors}
+              onToggle={(val) => toggleSelection("disliked_flavors", val)}
+              activeColor="#D32F2F"
+            />
+            <Text
               style={[
-                styles.selectedChip,
-                { backgroundColor: "#E8F5E9", borderColor: "#A5D6A7" },
+                styles.aversionLabel,
+                { marginTop: 12, color: "#D32F2F" },
               ]}
-              onPress={() => toggleSelection("preferred_foods", ing)}
             >
-              <Text style={[styles.selectedChipText, { color: "#2E7D32" }]}> 
-                {ing} ✕
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              Textures to limit:
+            </Text>
+            <MultiSelectGroup
+              options={TEXTURES}
+              selected={preferences.disliked_textures}
+              onToggle={(val) => toggleSelection("disliked_textures", val)}
+              activeColor="#D32F2F"
+            />
+          </View>
 
-        <SectionHeader title="Disliked Foods" color="#D32F2F" />
-        <View style={[styles.searchContainer, filteredDisliked.length > 0 && { marginBottom: 32 }]}> 
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search ingredients to avoid..."
-            value={dislikeSearch}
-            onChangeText={setDislikeSearch}
-          />
-          {filteredDisliked.length > 0 && (
-            <View style={styles.resultsContainer}>
-              <ScrollView nestedScrollEnabled={true} style={{maxHeight: 135}}>
-                {filteredDisliked.map((ing) => (
-                  <TouchableOpacity
-                    key={ing}
-                    style={styles.resultItem}
-                    onPress={() => {
-                      toggleSelection("disliked_foods", ing);
-                      setDislikeSearch("");
-                    }}
-                  >
-                    <Text numberOfLines={1} ellipsizeMode="tail" style={{width: '100%'}}>{ing}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </View>
+          {/* Add extra space between Preferred and Disliked Foods */}
+          <View style={{ height: 32 }} />
 
-        <View style={styles.selectedIngredients}>
-          {preferences.disliked_foods.map((ing) => (
-            <TouchableOpacity
-              key={ing}
-              style={styles.selectedChip}
-              onPress={() => toggleSelection("disliked_foods", ing)}
-            >
-              <Text style={styles.selectedChipText}>{ing} ✕</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <SectionHeader title="Preferred Foods" />
+          <View
+            style={[
+              styles.searchContainer,
+              filteredPreferred.length > 0 && { marginBottom: 32 },
+            ]}
+          >
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search preferred foods..."
+              value={preferredSearch}
+              onChangeText={setPreferredSearch}
+            />
+            {filteredPreferred.length > 0 && (
+              <View style={styles.resultsContainer}>
+                <ScrollView
+                  nestedScrollEnabled={true}
+                  style={{ maxHeight: 135 }}
+                >
+                  {filteredPreferred.map((ing) => (
+                    <TouchableOpacity
+                      key={ing}
+                      style={styles.resultItem}
+                      onPress={() => {
+                        toggleSelection("preferred_foods", ing);
+                        setPreferredSearch("");
+                      }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ width: "100%" }}
+                      >
+                        {ing}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
 
-        <TouchableOpacity
-          style={[
-            styles.saveButton,
-            { backgroundColor: "#2196F3", marginTop: 12 },
-          ]}
-          onPress={() => savePreferences(true)}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Continue to App</Text>
-          )}
-        </TouchableOpacity>
+          <View style={styles.selectedIngredients}>
+            {preferences.preferred_foods.map((ing) => (
+              <TouchableOpacity
+                key={ing}
+                style={[
+                  styles.selectedChip,
+                  { backgroundColor: "#E8F5E9", borderColor: "#A5D6A7" },
+                ]}
+                onPress={() => toggleSelection("preferred_foods", ing)}
+              >
+                <Text style={[styles.selectedChipText, { color: "#2E7D32" }]}>
+                  {ing} ✕
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <SectionHeader title="Disliked Foods" color="#D32F2F" />
+          <View
+            style={[
+              styles.searchContainer,
+              filteredDisliked.length > 0 && { marginBottom: 32 },
+            ]}
+          >
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search ingredients to avoid..."
+              value={dislikeSearch}
+              onChangeText={setDislikeSearch}
+            />
+            {filteredDisliked.length > 0 && (
+              <View style={styles.resultsContainer}>
+                <ScrollView
+                  nestedScrollEnabled={true}
+                  style={{ maxHeight: 135 }}
+                >
+                  {filteredDisliked.map((ing) => (
+                    <TouchableOpacity
+                      key={ing}
+                      style={styles.resultItem}
+                      onPress={() => {
+                        toggleSelection("disliked_foods", ing);
+                        setDislikeSearch("");
+                      }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={{ width: "100%" }}
+                      >
+                        {ing}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.selectedIngredients}>
+            {preferences.disliked_foods.map((ing) => (
+              <TouchableOpacity
+                key={ing}
+                style={styles.selectedChip}
+                onPress={() => toggleSelection("disliked_foods", ing)}
+              >
+                <Text style={styles.selectedChipText}>{ing} ✕</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              { backgroundColor: "#2196F3", marginTop: 12 },
+            ]}
+            onPress={() => savePreferences(true)}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Continue to App</Text>
+            )}
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

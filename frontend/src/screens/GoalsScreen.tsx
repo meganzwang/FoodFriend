@@ -30,9 +30,14 @@ interface GoalsScreenProps {
 const STORAGE_KEY = "@user_preferences";
 const USER_ID_KEY = "@food_friend_user_id";
 
-const SectionHeader: React.FC<{ title: string; color?: string }> = ({ title, color }) => (
+const SectionHeader: React.FC<{ title: string; color?: string }> = ({
+  title,
+  color,
+}) => (
   <View style={styles.sectionHeader}>
-    <Text style={[styles.sectionHeaderText, color ? { color } : null]}>{title}</Text>
+    <Text style={[styles.sectionHeaderText, color ? { color } : null]}>
+      {title}
+    </Text>
   </View>
 );
 
@@ -43,7 +48,15 @@ interface MultiSelectGroupProps {
   disabledOptions?: string[];
 }
 
-const MultiSelectGroup: React.FC<MultiSelectGroupProps & { activeColor?: string }> = ({ options, selected, onToggle, disabledOptions = [], activeColor = "#4CAF50" }) => (
+const MultiSelectGroup: React.FC<
+  MultiSelectGroupProps & { activeColor?: string }
+> = ({
+  options,
+  selected,
+  onToggle,
+  disabledOptions = [],
+  activeColor = "#4CAF50",
+}) => (
   <View style={styles.groupContainer}>
     {options.map((option) => {
       const isSelected = (selected || []).includes(option);
@@ -53,7 +66,10 @@ const MultiSelectGroup: React.FC<MultiSelectGroupProps & { activeColor?: string 
           key={option}
           style={[
             styles.chip,
-            isSelected && { backgroundColor: activeColor, borderColor: activeColor },
+            isSelected && {
+              backgroundColor: activeColor,
+              borderColor: activeColor,
+            },
             isDisabled && { opacity: 0.4 },
           ]}
           onPress={() => !isDisabled && onToggle(option)}
@@ -62,8 +78,8 @@ const MultiSelectGroup: React.FC<MultiSelectGroupProps & { activeColor?: string 
           <Text
             style={[
               styles.chipText,
-              isSelected && { color: '#fff', fontWeight: '500' },
-              isDisabled && { color: '#888' },
+              isSelected && { color: "#fff", fontWeight: "500" },
+              isDisabled && { color: "#888" },
             ]}
           >
             {option.replace(/_/g, " ")}
@@ -187,17 +203,17 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   }
 
   return (
-
-    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom", "left", "right"]}
+    >
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>{'←'}</Text>
+          <Text style={styles.backButtonText}>{"←"}</Text>
         </TouchableOpacity>
         <Text style={styles.titleHeader}>What are your goals?</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-      
-
         <SectionHeader title="Diet" />
         <MultiSelectGroup
           options={DIETS}
@@ -218,7 +234,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
         />
 
         <SectionHeader title="Goals to Decrease" color="#D32F2F" />
-        <Text style={[styles.helperText, { color: '#D32F2F' }]}>Select nutrients you want to limit.</Text>
+        <Text style={styles.helperText}>
+          Select nutrients you want to limit.
+        </Text>
 
         <MultiSelectGroup
           options={NUTRIENT_GOALS}

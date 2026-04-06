@@ -40,66 +40,91 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
   const fetchRankings = async () => {
     try {
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const preferences = JSON.parse(saved);
-
-        console.log(
-          "[IngredientRankScreen] Fetching rankings from:",
-          `${CONFIG.API_URL}/api/rank-ingredients`,
+      if (!saved) {
+        setRankedIngredients([]);
+        setFilteredOut([]);
+        setError(
+          "No preferences found. Please complete your preferences first.",
         );
+        return;
+      }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          CONFIG.TIMEOUT_MS,
+      const preferences = JSON.parse(saved);
+
+      console.log(
+        "[IngredientRankScreen] Fetching rankings from:",
+        `${CONFIG.API_URL}/api/rank-ingredients`,
+      );
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+
+      const response = await fetch(`${CONFIG.API_URL}/api/rank-ingredients`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preferences),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text();
+      console.log(
+        "[IngredientRankScreen] Raw response:",
+        responseText.substring(0, 200),
+      );
+
+      if (!response.ok) {
+        setError(`Server returned status: ${response.status}`);
+        return;
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        if (data.error) {
+          console.error(
+            "[IngredientRankScreen] Backend returned error:",
+            data.error,
+          );
+          setError(data.error);
+          Alert.alert("Ranking Error", data.error);
+          return;
+        }
+
+        setRankedIngredients((data.ranked || []).slice(0, 5));
+        setFilteredOut(data.filtered || []);
+        setError(null);
+      } catch (parseError) {
+        console.error(
+          "[IngredientRankScreen] Failed to parse string as JSON:",
+          parseError,
         );
-
-        const response = await fetch(`${CONFIG.API_URL}/api/rank-ingredients`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(preferences),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        const responseText = await response.text();
-        console.log(
-          "[IngredientRankScreen] Raw response:",
-          responseText.substring(0, 200),
-        );
-
-        if (response.ok) {
-          try {
-            const data = JSON.parse(responseText);
-            if (data.error) {
-              console.error(
-                "[IngredientRankScreen] Backend returned error:",
-                data.error,
-              );
-              Alert.alert("Ranking Error", data.error);
-            } else {
-              setRankedIngredients((data.ranked || []).slice(0, 5));
-              setFilteredOut(data.filtered || []);
-                      setError(data.error);
-                      Alert.alert("Ranking Error", data.error);
-            );
-            console.error(
-              "[IngredientRankScreen] Failed to parse string as JSON:",
-                      setError(null);
-              responseText,
-            );
-                    setError("Failed to parse server response. Please try again later.");
+        setError("Failed to parse server response. Please try again later.");
+      }
     } catch (e: any) {
       console.error("[IngredientRankScreen] Network or other error:", e);
-                  setError(`Server returned status: ${response.status}`);
+      setError("Network or server error. Please try again later.");
+    } finally {
       setLoading(false);
     }
-                setError("Network or server error. Please try again later.");
+  };
+
+  if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.loadingText}>Ranking ingredients for you...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={fetchRankings} style={styles.continueButton}>
+          <Text style={styles.continueButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -110,17 +135,6 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
         <Text style={styles.title}>Your Personalized Rankings</Text>
         <Text style={styles.subtitle}>
           Based on your goals and preferences, here is how we rank our test
-            // Show error if present
-            if (error) {
-              return (
-                <View style={styles.centered}>
-                  <Text style={{ color: 'red', fontSize: 16, textAlign: 'center', margin: 16 }}>{error}</Text>
-                  <TouchableOpacity onPress={fetchRankings} style={styles.continueButton}>
-                    <Text style={styles.continueButtonText}>Retry</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            }
           ingredients:
         </Text>
 
@@ -201,6 +215,13 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: "#666",
+  },
+  errorText: {
+    color: "#D32F2F",
+    fontSize: 16,
+    textAlign: "center",
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
   scrollContent: {
     padding: 20,
