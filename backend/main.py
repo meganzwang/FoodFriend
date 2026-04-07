@@ -309,10 +309,24 @@ def init_db():
             selected_ingredients_json TEXT NOT NULL DEFAULT '[]',
             selected_flavors_json     TEXT NOT NULL DEFAULT '[]',
             selected_textures_json    TEXT NOT NULL DEFAULT '[]',
+            selected_nutrients_more_json TEXT NOT NULL DEFAULT '[]',
+            selected_nutrients_less_json TEXT NOT NULL DEFAULT '[]',
             created_at                TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES recommendation_runs(run_id)
         )
     """)
+
+    def ensure_column(table_name, column_name, column_definition):
+        existing_columns = {
+            row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name not in existing_columns:
+            conn.execute(
+                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+            )
+
+    ensure_column("recipe_feedback_events", "selected_nutrients_more_json", "TEXT NOT NULL DEFAULT '[]'")
+    ensure_column("recipe_feedback_events", "selected_nutrients_less_json", "TEXT NOT NULL DEFAULT '[]'")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_reco_runs_user_created ON recommendation_runs(user_id, created_at DESC)"
     )
@@ -985,7 +999,9 @@ async def process_recipe_feedback(request: Request):
       "recipe_ingredients": ["chicken breast", "broccoli", "soy sauce"],
       "selected_ingredients": ["chicken breast"],
       "selected_flavors": ["spicy", "umami"],
-      "selected_textures": ["crispy"]
+            "selected_textures": ["crispy"],
+            "selected_nutrients_more": ["protein"],
+            "selected_nutrients_less": ["calories"]
     }
     """
     try:
@@ -1015,6 +1031,8 @@ async def process_recipe_feedback(request: Request):
             "selected_ingredients": body.get("selected_ingredients", []),
             "selected_flavors": body.get("selected_flavors", []),
             "selected_textures": body.get("selected_textures", []),
+            "selected_nutrients_more": body.get("selected_nutrients_more", []),
+            "selected_nutrients_less": body.get("selected_nutrients_less", []),
         }
         
         update_vector = model.calculate_feedback_vector_update(feedback_data)
@@ -1050,6 +1068,8 @@ async def process_recipe_feedback(request: Request):
                 "ingredients": len(body.get("selected_ingredients", [])),
                 "flavors": len(body.get("selected_flavors", [])),
                 "textures": len(body.get("selected_textures", [])),
+                "nutrients_more": len(body.get("selected_nutrients_more", [])),
+                "nutrients_less": len(body.get("selected_nutrients_less", [])),
             },
             "message": "Recipe feedback processed and preference vector updated"
         }
@@ -1160,8 +1180,9 @@ async def log_recipe_feedback(request: Request):
                     INSERT INTO recipe_feedback_events (
                         run_id, user_id, recipe_id, recipe_title, feedback_type,
                         recipe_ingredients_json, selected_ingredients_json,
-                        selected_flavors_json, selected_textures_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        selected_flavors_json, selected_textures_json,
+                        selected_nutrients_more_json, selected_nutrients_less_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         run_id,
@@ -1173,6 +1194,8 @@ async def log_recipe_feedback(request: Request):
                         json.dumps(entry.get("selected_ingredients", []) or []),
                         json.dumps(entry.get("selected_flavors", []) or []),
                         json.dumps(entry.get("selected_textures", []) or []),
+                        json.dumps(entry.get("selected_nutrients_more", []) or []),
+                        json.dumps(entry.get("selected_nutrients_less", []) or []),
                         now,
                     ),
                 )

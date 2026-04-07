@@ -25,11 +25,27 @@ class FoodFriendModel:
             'saturated_fat_amount_g', 'fiber_amount_g', 'carbohydrates_amount_g'
         ]
         self.macro_pct_cols = ['pct_protein', 'pct_fat', 'pct_carbs']
+        self.NUTRIENT_COLUMN_MAP = {
+            'calories': 'calories_amount_kcal',
+            'protein': 'protein_amount_g',
+            'fat': 'fat_amount_g',
+            'sodium': 'sodium_amount_mg',
+            'fiber': 'fiber_amount_g',
+            'sugar': 'sugar_amount_g',
+            'saturated_fat': 'saturated_fat_amount_g',
+            'iron': 'iron_amount_mg',
+        }
+        self.NUTRIENT_PCT_MAP = {
+            'protein': 'pct_protein',
+            'fat': 'pct_fat',
+            'carbohydrates': 'pct_carbs',
+        }
         
         # Binary tags are everything else (excluding metadata)
         metadata = ['id', 'name', 'flavor', 'texture']
         self.tag_cols = [c for c in self.df.columns if c not in metadata + self.nutrition_cols + self.macro_pct_cols]
         self.feature_cols = self.tag_cols + self.nutrition_cols + self.macro_pct_cols
+        self.feature_index_by_name = {col: idx for idx, col in enumerate(self.feature_cols)}
 
         # Cache normalized names for fast preferred/disliked food matching
         self.df['_normalized_name'] = self.df['name'].astype(str).map(self._normalize_food_name)
@@ -88,6 +104,30 @@ class FoodFriendModel:
         normalized = re.sub(r'\s+', ' ', normalized)
         return normalized
 
+    def _normalize_nutrient_key(self, value):
+        normalized = str(value or '').strip().lower().replace('-', '_')
+        normalized = re.sub(r'\s+', '_', normalized)
+        return {
+            'sat_fat': 'saturated_fat',
+            'saturatedfat': 'saturated_fat',
+            'saturated_fat': 'saturated_fat',
+        }.get(normalized, normalized)
+
+    def _apply_feature_adjustment(self, vector, column_name, amount):
+        column_index = self.feature_index_by_name.get(column_name)
+        if column_index is not None:
+            vector[column_index] += amount
+
+    def _apply_nutrient_adjustment(self, vector, nutrient_name, amount):
+        normalized = self._normalize_nutrient_key(nutrient_name)
+        nutrient_column = self.NUTRIENT_COLUMN_MAP.get(normalized)
+        if nutrient_column:
+            self._apply_feature_adjustment(vector, nutrient_column, amount)
+
+        pct_column = self.NUTRIENT_PCT_MAP.get(normalized)
+        if pct_column:
+            self._apply_feature_adjustment(vector, pct_column, amount)
+
     def _get_average_food_vector(self, food_names):
         if not food_names:
             return None
@@ -140,20 +180,10 @@ class FoodFriendModel:
         offset = len(self.tag_cols)
         
         for goal in preferences.get("increase_nutrients", []):
-            if goal in self.nutrition_cols:
-                user_vec[offset + self.nutrition_cols.index(goal)] = 1.0
-            
-            # Smart logic: if they want high protein/fat/carbs, target the percentage too
-            macro_prefix = goal.split('_')[0] # 'protein', 'fat', or 'carbohydrates'
-            if macro_prefix == 'carbohydrates': macro_prefix = 'carbs'
-            pct_col = f"pct_{macro_prefix}"
-            if pct_col in self.macro_pct_cols:
-                user_vec[offset + len(self.nutrition_cols) + self.macro_pct_cols.index(pct_col)] = 1.0
+            self._apply_nutrient_adjustment(user_vec, goal, 1.0)
 
         for goal in preferences.get("decrease_nutrients", []):
-            # We target 0 for things they want to decrease
-            if goal in self.nutrition_cols:
-                user_vec[offset + self.nutrition_cols.index(goal)] = 0.0
+            self._apply_nutrient_adjustment(user_vec, goal, -1.0)
 
         # 3. Blend preferred/disliked foods into user vector
         preferred_foods = preferences.get("preferred_foods", []) or preferences.get("preferredFoods", [])
@@ -172,6 +202,23 @@ class FoodFriendModel:
         if disliked_food_vector is not None:
             disliked_food_vector = np.asarray(disliked_food_vector, dtype=np.float64)
             user_vec -= self.DISLIKED_FOOD_WEIGHT * disliked_food_vector
+
+        liked_nutrients_more = preferences.get("liked_recipe_nutrients_more", []) or []
+        liked_nutrients_less = preferences.get("liked_recipe_nutrients_less", []) or []
+        disliked_nutrients_more = preferences.get("disliked_recipe_nutrients_more", []) or []
+        disliked_nutrients_less = preferences.get("disliked_recipe_nutrients_less", []) or []
+
+        for nutrient in liked_nutrients_more:
+            self._apply_nutrient_adjustment(user_vec, nutrient, 1.0)
+
+        for nutrient in liked_nutrients_less:
+            self._apply_nutrient_adjustment(user_vec, nutrient, -1.0)
+
+        for nutrient in disliked_nutrients_more:
+            self._apply_nutrient_adjustment(user_vec, nutrient, -1.0)
+
+        for nutrient in disliked_nutrients_less:
+            self._apply_nutrient_adjustment(user_vec, nutrient, 1.0)
 
         # 4. Blend recipe feedback (ingredients, flavors, textures) into user vector.
         # If feedback_vector_sum exists, it is the source of truth to avoid double counting.
@@ -356,6 +403,8 @@ class FoodFriendModel:
         selected_ingredients = feedback_data.get("selected_ingredients", []) or []
         selected_flavors = feedback_data.get("selected_flavors", []) or []
         selected_textures = feedback_data.get("selected_textures", []) or []
+        selected_nutrients_more = feedback_data.get("selected_nutrients_more", []) or []
+        selected_nutrients_less = feedback_data.get("selected_nutrients_less", []) or []
         recipe_ingredients = feedback_data.get("recipe_ingredients", []) or []
         
         # Calculate feedback signal strength
@@ -392,5 +441,13 @@ class FoodFriendModel:
             if recipe_vector is not None:
                 recipe_vector = np.asarray(recipe_vector, dtype=np.float64)
                 update_vector += sign * recipe_weight * recipe_vector
+
+        # ─── COMPONENT 5: Nutrient direction feedback ───
+        nutrient_weight = 0.2
+        for nutrient in selected_nutrients_more:
+            self._apply_nutrient_adjustment(update_vector, nutrient, sign * nutrient_weight)
+
+        for nutrient in selected_nutrients_less:
+            self._apply_nutrient_adjustment(update_vector, nutrient, -sign * nutrient_weight)
         
         return update_vector

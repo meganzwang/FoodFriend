@@ -107,6 +107,10 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
     disliked_recipe_flavors: [],
     liked_recipe_textures: [],
     disliked_recipe_textures: [],
+    liked_recipe_nutrients_more: [],
+    liked_recipe_nutrients_less: [],
+    disliked_recipe_nutrients_more: [],
+    disliked_recipe_nutrients_less: [],
     cuisines: [],
     tried_recipe_ids: [],
   });
@@ -153,6 +157,14 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
             disliked_recipe_flavors: parsed.disliked_recipe_flavors || [],
             liked_recipe_textures: parsed.liked_recipe_textures || [],
             disliked_recipe_textures: parsed.disliked_recipe_textures || [],
+            liked_recipe_nutrients_more:
+              parsed.liked_recipe_nutrients_more || [],
+            liked_recipe_nutrients_less:
+              parsed.liked_recipe_nutrients_less || [],
+            disliked_recipe_nutrients_more:
+              parsed.disliked_recipe_nutrients_more || [],
+            disliked_recipe_nutrients_less:
+              parsed.disliked_recipe_nutrients_less || [],
             cuisines: parsed.cuisines || [],
             tried_recipe_ids: parsed.tried_recipe_ids || [],
           });
