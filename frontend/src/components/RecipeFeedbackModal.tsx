@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,10 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from "react-native";
-import { Recipe, FLAVORS, TEXTURES } from "../../types";
+import { Recipe, FLAVORS, NUTRIENT_GOALS, TEXTURES } from "../../types";
+
+type NutrientDirection = "more" | "less";
+type SectionKey = "ingredients" | "flavors" | "textures" | "nutrients";
 
 interface RecipeFeedbackModalProps {
   visible: boolean;
@@ -19,8 +22,26 @@ interface RecipeFeedbackModalProps {
     ingredients: string[];
     flavors: string[];
     textures: string[];
+    nutrientsMore: string[];
+    nutrientsLess: string[];
   }) => void;
 }
+
+const nutrientLabels: Record<string, { label: string }> = {
+  calories: { label: "Calories" },
+  protein: { label: "Protein" },
+  fat: { label: "Fat" },
+  sodium: { label: "Sodium" },
+  fiber: { label: "Fiber" },
+  sugar: { label: "Sugar" },
+  saturated_fat: { label: "Saturated Fat" },
+  iron: { label: "Iron" },
+};
+
+const formatNutrientChoice = (label: string, direction: NutrientDirection) => {
+  const directionLabel = direction === "more" ? "High" : "Low";
+  return `${directionLabel} ${label}`;
+};
 
 const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
   visible,
@@ -29,16 +50,22 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  type SectionKey = "ingredients" | "flavors" | "textures";
   const defaultExpandedSections: Record<SectionKey, boolean> = {
     ingredients: false,
     flavors: false,
     textures: false,
+    nutrients: false,
   };
 
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [selectedTextures, setSelectedTextures] = useState<string[]>([]);
+  const [selectedNutrientsMore, setSelectedNutrientsMore] = useState<string[]>(
+    [],
+  );
+  const [selectedNutrientsLess, setSelectedNutrientsLess] = useState<string[]>(
+    [],
+  );
   const [expandedSections, setExpandedSections] = useState<
     Record<SectionKey, boolean>
   >(defaultExpandedSections);
@@ -49,6 +76,25 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
       : "What didn't you like about this dish?";
 
   const buttonColor = feedbackType === "liked" ? "#4CAF50" : "#D32F2F";
+
+  const recipeIngredients = useMemo(() => recipe?.ingredients || [], [recipe]);
+
+  const nutrientPrompt =
+    feedbackType === "liked"
+      ? "What did you like about nutrients?"
+      : "What did you dislike about nutrients?";
+
+  const recipeNutrients = useMemo(
+    () =>
+      NUTRIENT_GOALS.map((nutrient) => {
+        const info = nutrientLabels[nutrient];
+        return {
+          nutrient,
+          label: info.label,
+        };
+      }),
+    [],
+  );
 
   const toggleSelection = (
     item: string,
@@ -62,19 +108,46 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
     }
   };
 
-  const handleSubmit = () => {
-    onSubmit({
-      ingredients: selectedIngredients,
-      flavors: selectedFlavors,
-      textures: selectedTextures,
+  const toggleNutrientSelection = (
+    nutrient: string,
+    direction: NutrientDirection,
+  ) => {
+    const setCurrent =
+      direction === "more"
+        ? setSelectedNutrientsMore
+        : setSelectedNutrientsLess;
+    const setOpposite =
+      direction === "more"
+        ? setSelectedNutrientsLess
+        : setSelectedNutrientsMore;
+
+    setCurrent((current) => {
+      if (current.includes(nutrient)) {
+        return current.filter((item) => item !== nutrient);
+      }
+
+      setOpposite((items) => items.filter((item) => item !== nutrient));
+      return [...current, nutrient];
     });
-    resetSelections();
   };
 
   const resetSelections = () => {
     setSelectedIngredients([]);
     setSelectedFlavors([]);
     setSelectedTextures([]);
+    setSelectedNutrientsMore([]);
+    setSelectedNutrientsLess([]);
+  };
+
+  const handleSubmit = () => {
+    onSubmit({
+      ingredients: selectedIngredients,
+      flavors: selectedFlavors,
+      textures: selectedTextures,
+      nutrientsMore: selectedNutrientsMore,
+      nutrientsLess: selectedNutrientsLess,
+    });
+    resetSelections();
   };
 
   const handleClose = () => {
@@ -101,14 +174,8 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
     if (count === 0) return "None selected";
     if (count === 1) return `1 selected: ${items[0]}`;
     if (count === 2) return `2 selected: ${items[0]} and ${items[1]}`;
-
     return `${count} selected: ${items[0]}, ${items[1]}, and ${items[2]}`;
   };
-
-  const recipeIngredients = useMemo(
-    () => recipe?.ingredients || [],
-    [recipe?.ingredients],
-  );
 
   return (
     <Modal
@@ -286,9 +353,98 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
               </View>
             )}
           </View>
+
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.dropdownHeader}
+              onPress={() => toggleSection("nutrients")}
+            >
+              <View style={styles.dropdownHeaderLeft}>
+                <Text style={styles.sectionTitle}>Nutrients</Text>
+                <Text style={styles.selectionSummary}>
+                  {selectedNutrientsMore.length === 0 &&
+                  selectedNutrientsLess.length === 0
+                    ? "None selected"
+                    : `${selectedNutrientsMore.length} high + ${selectedNutrientsLess.length} low selected`}
+                </Text>
+              </View>
+              <Text style={styles.dropdownIndicator}>
+                {expandedSections.nutrients ? "Hide" : "Show"}
+              </Text>
+            </TouchableOpacity>
+            {expandedSections.nutrients && (
+              <View style={styles.nutrientSection}>
+                <Text style={styles.nutrientHelperText}>
+                  {nutrientPrompt} Example: High Protein, Low Calories.
+                </Text>
+                <View style={styles.chipContainer}>
+                  {recipeNutrients.map((nutrient) => {
+                    const highSelected = selectedNutrientsMore.includes(
+                      nutrient.nutrient,
+                    );
+                    const lowSelected = selectedNutrientsLess.includes(
+                      nutrient.nutrient,
+                    );
+
+                    return (
+                      <React.Fragment key={nutrient.nutrient}>
+                        <TouchableOpacity
+                          key={`high-${nutrient.nutrient}`}
+                          style={[
+                            styles.chip,
+                            styles.nutrientChip,
+                            highSelected && {
+                              backgroundColor: buttonColor,
+                              borderColor: buttonColor,
+                            },
+                          ]}
+                          onPress={() =>
+                            toggleNutrientSelection(nutrient.nutrient, "more")
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              styles.nutrientChipText,
+                              highSelected && styles.chipTextSelected,
+                            ]}
+                          >
+                            {formatNutrientChoice(nutrient.label, "more")}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          key={`low-${nutrient.nutrient}`}
+                          style={[
+                            styles.chip,
+                            styles.nutrientChip,
+                            lowSelected && {
+                              backgroundColor: buttonColor,
+                              borderColor: buttonColor,
+                            },
+                          ]}
+                          onPress={() =>
+                            toggleNutrientSelection(nutrient.nutrient, "less")
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              styles.nutrientChipText,
+                              lowSelected && styles.chipTextSelected,
+                            ]}
+                          >
+                            {formatNutrientChoice(nutrient.label, "less")}
+                          </Text>
+                        </TouchableOpacity>
+                      </React.Fragment>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
         </ScrollView>
 
-        {/* Action Buttons */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: "#ccc" }]}
@@ -318,102 +474,120 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: "#333",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   recipeName: {
     fontSize: 16,
-    color: "#666",
-    fontStyle: "italic",
+    fontWeight: "600",
+    color: "#555",
+    marginBottom: 8,
   },
   helperText: {
-    marginTop: 10,
+    color: "#666",
     fontSize: 13,
-    color: "#616161",
     lineHeight: 18,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  nutrientSection: {
+    marginTop: 10,
+  },
+  nutrientHelperText: {
+    color: "#666",
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
   },
   dropdownHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    paddingBottom: 8,
-    marginBottom: 12,
+    borderBottomColor: "#ddd",
   },
   dropdownHeaderLeft: {
     flex: 1,
-    paddingRight: 12,
+    marginRight: 12,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
     color: "#333",
   },
   selectionSummary: {
-    marginTop: 4,
     fontSize: 12,
-    color: "#616161",
+    color: "#666",
+    marginTop: 2,
   },
   dropdownIndicator: {
-    color: "#1976D2",
     fontSize: 13,
+    color: "#1976D2",
     fontWeight: "600",
   },
   chipContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginHorizontal: -4,
-  },
-  emptyText: {
-    color: "#777",
-    fontSize: 13,
+    gap: 8,
+    marginTop: 12,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    margin: 4,
+    borderColor: "#ccc",
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: "#fff",
+  },
+  nutrientChip: {
+    alignItems: "flex-start",
   },
   chipText: {
-    color: "#666",
-    fontSize: 14,
+    fontSize: 13,
+    color: "#333",
+  },
+  nutrientChipText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   chipTextSelected: {
     color: "#fff",
-    fontWeight: "500",
+    fontWeight: "700",
+  },
+  emptyText: {
+    marginTop: 12,
+    color: "#777",
+    fontSize: 13,
   },
   footer: {
     flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#fff",
+    gap: 12,
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-    gap: 10,
+    borderTopColor: "#e0e0e0",
+    backgroundColor: "#fff",
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: "center",
   },
   buttonText: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });
 
+export { RecipeFeedbackModal };
 export default RecipeFeedbackModal;

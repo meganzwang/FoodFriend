@@ -225,6 +225,10 @@ export interface UserPreferences {
   disliked_recipe_flavors: string[];
   liked_recipe_textures: string[];
   disliked_recipe_textures: string[];
+  liked_recipe_nutrients_more: string[];
+  liked_recipe_nutrients_less: string[];
+  disliked_recipe_nutrients_more: string[];
+  disliked_recipe_nutrients_less: string[];
   cuisines: string[];
   tried_recipe_ids?: number[];
   tried_recipes?: TriedRecipe[];

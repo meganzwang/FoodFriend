@@ -51,6 +51,8 @@ interface RecipeFeedbackEntry {
   ingredients: string[];
   flavors: string[];
   textures: string[];
+  nutrientsMore: string[];
+  nutrientsLess: string[];
 }
 
 const STORAGE_KEY = "@user_preferences";
@@ -122,6 +124,8 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         ingredients: prev[recipe.id]?.ingredients || [],
         flavors: prev[recipe.id]?.flavors || [],
         textures: prev[recipe.id]?.textures || [],
+        nutrientsMore: prev[recipe.id]?.nutrientsMore || [],
+        nutrientsLess: prev[recipe.id]?.nutrientsLess || [],
       },
     }));
   };
@@ -161,6 +165,8 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
     ingredients: string[];
     flavors: string[];
     textures: string[];
+    nutrientsMore: string[];
+    nutrientsLess: string[];
   }) => {
     if (!activeRecipe?.id) return;
 
@@ -171,6 +177,8 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         ingredients: feedback.ingredients,
         flavors: feedback.flavors,
         textures: feedback.textures,
+        nutrientsMore: feedback.nutrientsMore,
+        nutrientsLess: feedback.nutrientsLess,
       },
     }));
 
@@ -292,6 +300,22 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
           saved.disliked_recipe_textures,
           dislikedTextures,
         ),
+        liked_recipe_nutrients_more: mergeUnique(
+          saved.liked_recipe_nutrients_more,
+          likedEntries.flatMap((entry) => entry.nutrientsMore),
+        ),
+        liked_recipe_nutrients_less: mergeUnique(
+          saved.liked_recipe_nutrients_less,
+          likedEntries.flatMap((entry) => entry.nutrientsLess),
+        ),
+        disliked_recipe_nutrients_more: mergeUnique(
+          saved.disliked_recipe_nutrients_more,
+          dislikedEntries.flatMap((entry) => entry.nutrientsMore),
+        ),
+        disliked_recipe_nutrients_less: mergeUnique(
+          saved.disliked_recipe_nutrients_less,
+          dislikedEntries.flatMap((entry) => entry.nutrientsLess),
+        ),
         cuisines: saved.cuisines || [],
         name: saved.name,
         tried_recipe_ids: Array.from(
@@ -321,6 +345,10 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
               selected_ingredients: feedbackByRecipe[recipe.id].ingredients,
               selected_flavors: feedbackByRecipe[recipe.id].flavors,
               selected_textures: feedbackByRecipe[recipe.id].textures,
+              selected_nutrients_more:
+                feedbackByRecipe[recipe.id].nutrientsMore,
+              selected_nutrients_less:
+                feedbackByRecipe[recipe.id].nutrientsLess,
             }));
 
           await fetch(`${CONFIG.API_URL}/api/log-recipe-feedback`, {
@@ -488,7 +516,10 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
                 <Text style={styles.statusText}>
                   Saved as {feedback.type} ({feedback.ingredients.length}{" "}
                   ingredient, {feedback.flavors.length} flavor,{" "}
-                  {feedback.textures.length} texture tags)
+                  {feedback.textures.length} texture,{" "}
+                  {feedback.nutrientsMore.length +
+                    feedback.nutrientsLess.length}{" "}
+                  nutrient tags)
                 </Text>
               )}
             </View>
