@@ -59,13 +59,30 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
       const saved = await AsyncStorage.getItem(STORAGE_KEY);
       const prefs: StoredUserPreferences = saved ? JSON.parse(saved) : {};
 
+      console.log("[RECO_FRONTEND] API_URL", CONFIG.API_URL);
+      console.log("[RECO_FRONTEND] request", {
+        user_id: prefs.user_id,
+        tried_recipe_ids_count: (prefs.tried_recipe_ids || []).length,
+        debug_recommendations: __DEV__,
+      });
+
       const response = await fetch(`${CONFIG.API_URL}/api/recommend-recipes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(prefs),
+        body: JSON.stringify({
+          ...prefs,
+          debug_recommendations: __DEV__,
+        }),
       });
 
       const data = await response.json();
+
+      console.log("[RECO_FRONTEND] response", {
+        status: response.status,
+        recommendation_run_id: data?.recommendation_run_id,
+        recipes_count: (data?.recipes || []).length,
+        debug_counts: data?.debug?.counts,
+      });
 
       if (!response.ok || data.error) {
         throw new Error(

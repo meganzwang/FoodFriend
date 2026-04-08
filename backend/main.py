@@ -135,6 +135,8 @@ async def get_nutrient_progress_report_pdf(user_id: str, body: dict = Body(...))
 # backend/main.py
 import csv
 import json
+import hashlib
+import random
 import re
 import socket
 import sqlite3
@@ -145,7 +147,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from model import FoodFriendModel
 from spoon_client import SpoonacularClient
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -376,7 +378,12 @@ TARGET_INGREDIENTS = {
     "Shrimp": "shrimp",
 }
 
-MAX_TOP_INGREDIENTS = 10
+MAX_TOP_INGREDIENTS = 20
+INGREDIENT_GROUP_SIZE = 5
+INGREDIENT_GROUP_COUNT = 4
+RECIPES_PER_GROUP_CALL = 7
+IGNORED_RECIPE_COOLDOWN_DAYS = 21
+DISLIKED_RECIPE_COOLDOWN_DAYS = 90
 RESTRICTED_INGREDIENTS_CSV = os.path.join(
     os.path.dirname(__file__), "..", "data", "restricted_ingredients_clean.csv"
 )
@@ -391,6 +398,154 @@ def _normalize_token(value):
 def _normalize_ingredient_name(value):
     normalized = str(value or "").strip().lower()
     return re.sub(r"\s+", " ", normalized)
+
+
+def _debug_enabled(profile):
+    return bool((profile or {}).get("debug_recommendations"))
+
+
+def log_reco_debug(user_id, stage, payload, enabled=False):
+    if not enabled:
+        return
+    safe_payload = payload if isinstance(payload, dict) else {"value": payload}
+    try:
+        serialized = json.dumps(safe_payload, ensure_ascii=True, default=str)
+    except Exception:
+        serialized = str(safe_payload)
+    print(f"[RECO_DEBUG] user={user_id or 'anonymous'} stage={stage} payload={serialized}")
+
+
+def _dedupe_preserving_order(values):
+    seen = set()
+    result = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def build_weekly_ingredient_groups(
+    ingredient_names,
+    user_id,
+    group_count=INGREDIENT_GROUP_COUNT,
+    group_size=INGREDIENT_GROUP_SIZE,
+):
+    """Build deterministic weekly ingredient groups so pairings rotate week-to-week."""
+    normalized_names = [str(name).strip() for name in ingredient_names if str(name).strip()]
+    unique_names = _dedupe_preserving_order(normalized_names)
+    if not unique_names:
+        return []
+
+    week_key = datetime.utcnow().strftime("%G-W%V")
+    seed_input = f"{(user_id or 'anonymous').upper()}|{week_key}|{'|'.join(unique_names)}"
+    seed = int(hashlib.sha256(seed_input.encode("utf-8")).hexdigest()[:16], 16)
+
+    shuffled = unique_names.copy()
+    rng = random.Random(seed)
+    rng.shuffle(shuffled)
+
+    groups = []
+    cursor = 0
+    for _ in range(group_count):
+        if cursor >= len(shuffled):
+            break
+        group = shuffled[cursor : cursor + group_size]
+        cursor += group_size
+        if group:
+            groups.append(group)
+
+    return groups
+
+
+def interleave_recipes_by_source_group(recipes):
+    """Round-robin recipes so neighboring items are less likely from the same API call."""
+    if not recipes:
+        return []
+
+    buckets = {}
+    for recipe in recipes:
+        group_id = recipe.get("_source_group", 0)
+        buckets.setdefault(group_id, []).append(recipe)
+
+    interleaved = []
+    group_ids = sorted(buckets.keys())
+    while True:
+        progressed = False
+        for group_id in group_ids:
+            bucket = buckets[group_id]
+            if not bucket:
+                continue
+            interleaved.append(bucket.pop(0))
+            progressed = True
+        if not progressed:
+            break
+
+    return interleaved
+
+
+def get_history_blocked_recipe_ids(
+    user_id,
+    ignored_cooldown_days=IGNORED_RECIPE_COOLDOWN_DAYS,
+    disliked_cooldown_days=DISLIKED_RECIPE_COOLDOWN_DAYS,
+):
+    """
+    Block recipes the user ignored recently or explicitly disliked.
+    This reduces week-to-week repeats for no-action outcomes.
+    """
+    if not user_id:
+        return {
+            "blocked_ids": set(),
+            "ignored_ids": set(),
+            "disliked_ids": set(),
+            "ignored_cutoff": None,
+            "disliked_cutoff": None,
+        }
+
+    now = datetime.utcnow()
+    ignored_cutoff = (now - timedelta(days=ignored_cooldown_days)).isoformat()
+    disliked_cutoff = (now - timedelta(days=disliked_cooldown_days)).isoformat()
+
+    conn = get_db()
+    try:
+        ignored_rows = conn.execute(
+            """
+            SELECT DISTINCT rr.recipe_id
+            FROM recommended_recipes rr
+            JOIN recommendation_runs run ON run.run_id = rr.run_id
+            WHERE rr.user_id = ?
+              AND rr.was_selected = 0
+              AND (rr.feedback_type IS NULL OR rr.feedback_type = '')
+              AND run.created_at >= ?
+            """,
+            (user_id, ignored_cutoff),
+        ).fetchall()
+
+        disliked_rows = conn.execute(
+            """
+            SELECT DISTINCT rr.recipe_id
+            FROM recommended_recipes rr
+            WHERE rr.user_id = ?
+              AND rr.feedback_type = 'disliked'
+              AND rr.feedback_at IS NOT NULL
+              AND rr.feedback_at >= ?
+            """,
+            (user_id, disliked_cutoff),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    ignored_ids = {str(row["recipe_id"]) for row in ignored_rows}
+    disliked_ids = {str(row["recipe_id"]) for row in disliked_rows}
+    blocked = ignored_ids | disliked_ids
+    return {
+        "blocked_ids": blocked,
+        "ignored_ids": ignored_ids,
+        "disliked_ids": disliked_ids,
+        "ignored_cutoff": ignored_cutoff,
+        "disliked_cutoff": disliked_cutoff,
+    }
 
 
 def _parse_csv_labels(value):
@@ -829,6 +984,24 @@ async def recommend_recipes(request: Request):
     try:
         user_profile = await request.json()
         user_id = (user_profile.get("user_id") or "").upper() or None
+        debug_enabled = _debug_enabled(user_profile)
+
+        print(
+            "[RECO_REQUEST] "
+            f"user={user_id or 'anonymous'} "
+            f"debug={debug_enabled} "
+            f"has_tried_ids={bool((user_profile.get('tried_recipe_ids') or []))}"
+        )
+
+        log_reco_debug(
+            user_id,
+            "request_received",
+            {
+                "has_user_id": bool(user_id),
+                "payload_keys": sorted(list((user_profile or {}).keys())),
+            },
+            enabled=debug_enabled,
+        )
 
         api_key = os.getenv("SPOONACULAR_API_KEY")
         if not api_key:
@@ -840,6 +1013,24 @@ async def recommend_recipes(request: Request):
             for recipe_id in (user_profile.get("tried_recipe_ids") or [])
             if recipe_id is not None
         }
+        history_blocking = get_history_blocked_recipe_ids(user_id)
+        history_blocked_recipe_ids = history_blocking["blocked_ids"]
+        blocked_recipe_ids = tried_recipe_ids | history_blocked_recipe_ids
+
+        log_reco_debug(
+            user_id,
+            "history_blocking",
+            {
+                "tried_recipe_ids_count": len(tried_recipe_ids),
+                "ignored_blocked_count": len(history_blocking["ignored_ids"]),
+                "disliked_blocked_count": len(history_blocking["disliked_ids"]),
+                "blocked_total_count": len(blocked_recipe_ids),
+                "ignored_cutoff": history_blocking["ignored_cutoff"],
+                "disliked_cutoff": history_blocking["disliked_cutoff"],
+            },
+            enabled=debug_enabled,
+        )
+
         ranked_pool = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS * 30)
         top_ranked, filtered = filter_ranked_ingredients_by_restrictions(
             ranked_pool,
@@ -848,68 +1039,171 @@ async def recommend_recipes(request: Request):
         )
         top_ingredient_names = [item.get('name') for item in top_ranked if item.get('name')]
 
+        log_reco_debug(
+            user_id,
+            "ingredients_ranked",
+            {
+                "ranked_pool_count": len(ranked_pool),
+                "top_ranked_count": len(top_ranked),
+                "top_ingredient_names": top_ingredient_names,
+            },
+            enabled=debug_enabled,
+        )
+
         if not top_ingredient_names:
             return {"top_ingredients": [], "ranked": top_ranked, "filtered": filtered, "recipes": []}
 
         spoon = SpoonacularClient(api_key=api_key)
-        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=30)
+        ingredient_groups = build_weekly_ingredient_groups(
+            top_ingredient_names,
+            user_id=user_id,
+            group_count=INGREDIENT_GROUP_COUNT,
+            group_size=INGREDIENT_GROUP_SIZE,
+        )
+
+        log_reco_debug(
+            user_id,
+            "ingredient_groups_built",
+            {
+                "group_count": len(ingredient_groups),
+                "groups": ingredient_groups,
+                "recipes_per_group_call": RECIPES_PER_GROUP_CALL,
+            },
+            enabled=debug_enabled,
+        )
 
         candidate_recipes = []
-        for recipe in spoon_recipes:
-            recipe_id = recipe.get("id")
-            if recipe_id is not None and str(recipe_id) in tried_recipe_ids:
-                continue
+        seen_recipe_ids = set()
+        blocked_by_history = 0
+        blocked_by_tried = 0
+        blocked_by_duplicate = 0
+        group_fetch_summaries = []
+        for group_idx, ingredient_group in enumerate(ingredient_groups):
+            spoon_recipes = spoon.get_recipes_by_model_ingredients(
+                ingredient_group,
+                n=RECIPES_PER_GROUP_CALL,
+            )
+            group_summary = {
+                "group_idx": group_idx,
+                "ingredients": ingredient_group,
+                "fetched": len(spoon_recipes or []),
+                "kept": 0,
+                "blocked_by_tried": 0,
+                "blocked_by_history": 0,
+                "blocked_by_duplicate": 0,
+            }
+            for recipe in spoon_recipes:
+                recipe_id = recipe.get("id")
+                recipe_id_str = str(recipe_id) if recipe_id is not None else None
+                if recipe_id_str and recipe_id_str in tried_recipe_ids:
+                    blocked_by_tried += 1
+                    group_summary["blocked_by_tried"] += 1
+                    continue
+                if recipe_id_str and recipe_id_str in history_blocked_recipe_ids:
+                    blocked_by_history += 1
+                    group_summary["blocked_by_history"] += 1
+                    continue
+                if recipe_id_str and recipe_id_str in seen_recipe_ids:
+                    blocked_by_duplicate += 1
+                    group_summary["blocked_by_duplicate"] += 1
+                    continue
 
-            nutrients = recipe.get('nutrition', {}).get('nutrients', [])
-            def nutrient_amount(name):
-                return next(
-                    (n.get('amount') for n in nutrients if str(n.get('name', '')).lower() == name),
-                    None,
-                )
+                nutrients = recipe.get('nutrition', {}).get('nutrients', [])
+                def nutrient_amount(name):
+                    return next(
+                        (n.get('amount') for n in nutrients if str(n.get('name', '')).lower() == name),
+                        None,
+                    )
 
-            calories = nutrient_amount('calories')
-            protein = nutrient_amount('protein')
-            fat = nutrient_amount('fat')
-            sodium = nutrient_amount('sodium')
-            fiber = nutrient_amount('fiber')
-            sugar = nutrient_amount('sugar')
-            saturated_fat = nutrient_amount('saturated fat')
-            iron = nutrient_amount('iron')
+                calories = nutrient_amount('calories')
+                protein = nutrient_amount('protein')
+                fat = nutrient_amount('fat')
+                sodium = nutrient_amount('sodium')
+                fiber = nutrient_amount('fiber')
+                sugar = nutrient_amount('sugar')
+                saturated_fat = nutrient_amount('saturated fat')
+                iron = nutrient_amount('iron')
 
-            ingredients = [
-                ing.get('name', '').lower().strip()
-                for ing in recipe.get('extendedIngredients', [])
-                if ing.get('name', '').strip()
-            ]
-            candidate_recipes.append({
-                "id": recipe_id,
-                "title": recipe.get("title", "Untitled Recipe"),
-                "image": recipe.get("image", ""),
-                "sourceUrl": recipe.get("sourceUrl", ""),
-                "readyInMinutes": recipe.get("readyInMinutes"),
-                "diets": recipe.get("diets", []),
-                "calories": calories,
-                "protein": protein,
-                "fat": fat,
-                "sodium": sodium,
-                "fiber": fiber,
-                "sugar": sugar,
-                "saturated_fat": saturated_fat,
-                "iron": iron,
-                "summary": recipe.get("summary", ""),
-                "ingredients": ingredients,
-            })
+                ingredients = [
+                    ing.get('name', '').lower().strip()
+                    for ing in recipe.get('extendedIngredients', [])
+                    if ing.get('name', '').strip()
+                ]
+                candidate_recipes.append({
+                    "id": recipe_id,
+                    "title": recipe.get("title", "Untitled Recipe"),
+                    "image": recipe.get("image", ""),
+                    "sourceUrl": recipe.get("sourceUrl", ""),
+                    "readyInMinutes": recipe.get("readyInMinutes"),
+                    "diets": recipe.get("diets", []),
+                    "calories": calories,
+                    "protein": protein,
+                    "fat": fat,
+                    "sodium": sodium,
+                    "fiber": fiber,
+                    "sugar": sugar,
+                    "saturated_fat": saturated_fat,
+                    "iron": iron,
+                    "summary": recipe.get("summary", ""),
+                    "ingredients": ingredients,
+                    "_source_group": group_idx,
+                })
+
+                if recipe_id_str:
+                    seen_recipe_ids.add(recipe_id_str)
+                group_summary["kept"] += 1
+
+            group_fetch_summaries.append(group_summary)
+
+        log_reco_debug(
+            user_id,
+            "candidate_build",
+            {
+                "group_fetch_summaries": group_fetch_summaries,
+                "candidate_count": len(candidate_recipes),
+                "blocked_by_tried": blocked_by_tried,
+                "blocked_by_history": blocked_by_history,
+                "blocked_by_duplicate": blocked_by_duplicate,
+            },
+            enabled=debug_enabled,
+        )
 
         safe_recipes, filtered_recipe_rows = filter_recipes_by_restrictions(
             candidate_recipes,
             user_profile,
         )
 
+        log_reco_debug(
+            user_id,
+            "post_restriction_filter",
+            {
+                "safe_recipes_count": len(safe_recipes),
+                "filtered_recipe_rows_count": len(filtered_recipe_rows),
+            },
+            enabled=debug_enabled,
+        )
+
+        interleaved_recipes = interleave_recipes_by_source_group(safe_recipes)
+
         recipes = diversify_recipes_by_ingredient_overlap(
-            safe_recipes,
+            interleaved_recipes,
             top_n=20,
             penalty_weight=0.35,
         )
+
+        log_reco_debug(
+            user_id,
+            "final_selection",
+            {
+                "interleaved_count": len(interleaved_recipes),
+                "final_recipes_count": len(recipes),
+                "final_recipe_ids": [str(r.get("id")) for r in recipes if r.get("id") is not None],
+            },
+            enabled=debug_enabled,
+        )
+
+        for recipe in recipes:
+            recipe.pop("_source_group", None)
 
         filtered.extend(
             [
@@ -970,12 +1264,39 @@ async def recommend_recipes(request: Request):
 
         log_top_ingredients(recommendation_run_id, user_id, top_ingredient_names)
 
+        print(
+            "[RECO_RESPONSE] "
+            f"user={user_id or 'anonymous'} "
+            f"run_id={recommendation_run_id} "
+            f"recipes_returned={len(recipes)} "
+            f"candidates={len(candidate_recipes)} safe={len(safe_recipes)}"
+        )
+
         return {
             "recommendation_run_id": recommendation_run_id,
             "top_ingredients": top_ingredient_names,
             "ranked": top_ranked,
             "filtered": filtered,
             "recipes": recipes,
+            "debug": {
+                "enabled": debug_enabled,
+                "counts": {
+                    "ranked_pool": len(ranked_pool),
+                    "top_ranked": len(top_ranked),
+                    "ingredient_groups": len(ingredient_groups),
+                    "candidate_recipes": len(candidate_recipes),
+                    "safe_recipes": len(safe_recipes),
+                    "final_recipes": len(recipes),
+                    "blocked_by_tried": blocked_by_tried,
+                    "blocked_by_history": blocked_by_history,
+                    "blocked_by_duplicate": blocked_by_duplicate,
+                    "history_ignored_blocked": len(history_blocking["ignored_ids"]),
+                    "history_disliked_blocked": len(history_blocking["disliked_ids"]),
+                },
+                "group_fetch_summaries": group_fetch_summaries,
+                "history_blocked_ids": sorted(list(history_blocked_recipe_ids)),
+                "tried_recipe_ids": sorted(list(tried_recipe_ids)),
+            },
         }
     except Exception as e:
         import traceback
@@ -1093,6 +1414,12 @@ async def mark_selected_recipes(run_id: str, request: Request):
             if recipe_id is not None
         ]
 
+        print(
+            "[SELECTED_SYNC_REQUEST] "
+            f"run_id={run_id} user_id={user_id or 'anonymous'} "
+            f"selected_count={len(selected_recipe_ids)} selected_recipe_ids={selected_recipe_ids}"
+        )
+
         conn = get_db()
         try:
             run = conn.execute(
@@ -1103,6 +1430,10 @@ async def mark_selected_recipes(run_id: str, request: Request):
                 raise HTTPException(status_code=404, detail="Recommendation run not found")
 
             if user_id and run["user_id"] and user_id != run["user_id"]:
+                print(
+                    "[SELECTED_SYNC_REJECTED] "
+                    f"run_id={run_id} request_user={user_id} owner_user={run['user_id']}"
+                )
                 raise HTTPException(status_code=403, detail="Run does not belong to this user")
 
             conn.execute(
@@ -1124,6 +1455,12 @@ async def mark_selected_recipes(run_id: str, request: Request):
             conn.commit()
         finally:
             conn.close()
+
+        print(
+            "[SELECTED_SYNC_APPLIED] "
+            f"run_id={run_id} user_id={user_id or run['user_id'] or 'anonymous'} "
+            f"selected_count={len(selected_recipe_ids)}"
+        )
 
         return {
             "status": "success",
