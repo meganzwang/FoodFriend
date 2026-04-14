@@ -185,58 +185,131 @@ def get_db():
     return conn
 
 
-def diversify_recipes_by_ingredient_overlap(recipes, top_n=10, penalty_weight=0.35):
-    """Return recipes reordered to favor diversity over ingredient overlap."""
+def _jaccard_similarity(values_a, values_b):
+    if not values_a and not values_b:
+        return 0.0
+    union = values_a | values_b
+    if not union:
+        return 0.0
+    return len(values_a & values_b) / float(len(union))
+
+
+def _to_float(value, default=0.0):
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
+def _recipe_nutrient_vector(recipe):
+    # Scale nutrients to similar ranges before cosine similarity.
+    return [
+        _to_float(recipe.get("calories")) / 1000.0,
+        _to_float(recipe.get("protein")) / 100.0,
+        _to_float(recipe.get("fat")) / 100.0,
+        _to_float(recipe.get("sodium")) / 2000.0,
+        _to_float(recipe.get("fiber")) / 50.0,
+        _to_float(recipe.get("sugar")) / 100.0,
+        _to_float(recipe.get("saturated_fat")) / 50.0,
+        _to_float(recipe.get("iron")) / 30.0,
+    ]
+
+
+def _cosine_similarity(vector_a, vector_b):
+    dot = sum(a * b for a, b in zip(vector_a, vector_b))
+    norm_a = sum(a * a for a in vector_a) ** 0.5
+    norm_b = sum(b * b for b in vector_b) ** 0.5
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _recipe_similarity(recipe_a, recipe_b, ingredient_weight=0.75, nutrient_weight=0.20, diet_weight=0.05):
+    ingredient_similarity = _jaccard_similarity(
+        recipe_a["_ingredient_set"],
+        recipe_b["_ingredient_set"],
+    )
+    nutrient_similarity = _cosine_similarity(
+        recipe_a["_nutrient_vector"],
+        recipe_b["_nutrient_vector"],
+    )
+    diet_similarity = _jaccard_similarity(
+        recipe_a["_diet_set"],
+        recipe_b["_diet_set"],
+    )
+    return (
+        ingredient_weight * ingredient_similarity
+        + nutrient_weight * nutrient_similarity
+        + diet_weight * diet_similarity
+    )
+
+
+def select_recipes_greedy_mmr(recipes, top_n=10, mmr_lambda=0.72):
+    """Greedy MMR reranking over candidate recipes to balance relevance and novelty."""
     if not recipes:
         return []
 
-    normalized_recipes = []
+    total_candidates = max(1, len(recipes))
+    prepared = []
     for idx, recipe in enumerate(recipes):
         ingredients = {
             ing.strip().lower()
             for ing in (recipe.get("ingredients") or [])
             if isinstance(ing, str) and ing.strip()
         }
-        normalized_recipes.append(
+        diets = {
+            diet.strip().lower()
+            for diet in (recipe.get("diets") or [])
+            if isinstance(diet, str) and diet.strip()
+        }
+        base_relevance = float(total_candidates - idx) / float(total_candidates)
+        prepared.append(
             {
                 **recipe,
                 "_ingredient_set": ingredients,
-                "_base_score": float(len(recipes) - idx),
+                "_diet_set": diets,
+                "_nutrient_vector": _recipe_nutrient_vector(recipe),
+                "_base_relevance": base_relevance,
             }
         )
 
     selected = []
-    selected_ingredient_union = set()
-    remaining = normalized_recipes.copy()
+    remaining = prepared.copy()
 
     while remaining and len(selected) < top_n:
-        best = None
+        best_recipe = None
         best_score = float("-inf")
 
-        for recipe in remaining:
-            ingredients = recipe["_ingredient_set"]
-            overlap = 0.0
-            if ingredients and selected_ingredient_union:
-                overlap = len(ingredients & selected_ingredient_union) / float(
-                    len(ingredients)
+        for candidate in remaining:
+            max_similarity = 0.0
+            if selected:
+                max_similarity = max(
+                    _recipe_similarity(candidate, chosen)
+                    for chosen in selected
                 )
-            score = recipe["_base_score"] * (1.0 - penalty_weight * overlap)
+
+            score = (
+                mmr_lambda * candidate["_base_relevance"]
+                - (1.0 - mmr_lambda) * max_similarity
+            )
+
             if score > best_score:
                 best_score = score
-                best = recipe
+                best_recipe = candidate
 
-        if best is None:
+        if best_recipe is None:
             break
 
-        selected.append(best)
-        selected_ingredient_union.update(best["_ingredient_set"])
-        remaining.remove(best)
+        selected.append(best_recipe)
+        remaining.remove(best_recipe)
 
     return [
         {
-            k: v
-            for k, v in recipe.items()
-            if k not in ("_ingredient_set", "_base_score")
+            key: value
+            for key, value in recipe.items()
+            if not key.startswith("_")
         }
         for recipe in selected
     ]
@@ -379,6 +452,7 @@ TARGET_INGREDIENTS = {
 MAX_TOP_INGREDIENTS = 10
 MAX_RECOMMENDED_RECIPES = 10
 SPOONACULAR_CANDIDATE_RECIPES = 30
+GREEDY_MMR_LAMBDA = 0.72
 INGREDIENT_COOLDOWN_RUNS = 5
 RECIPE_COOLDOWN_RUNS = 3
 INGREDIENT_SELECTION_POOL = MAX_TOP_INGREDIENTS * 8
@@ -1037,10 +1111,10 @@ async def recommend_recipes(request: Request):
             blocked_recipe_ids,
         )
 
-        recipes = diversify_recipes_by_ingredient_overlap(
+        recipes = select_recipes_greedy_mmr(
             safe_recipes,
             top_n=MAX_RECOMMENDED_RECIPES,
-            penalty_weight=0.35,
+            mmr_lambda=GREEDY_MMR_LAMBDA,
         )
 
         filtered.extend(
