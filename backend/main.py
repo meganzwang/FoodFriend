@@ -185,7 +185,7 @@ def get_db():
     return conn
 
 
-def diversify_recipes_by_ingredient_overlap(recipes, top_n=20, penalty_weight=0.35):
+def diversify_recipes_by_ingredient_overlap(recipes, top_n=10, penalty_weight=0.35):
     """Return recipes reordered to favor diversity over ingredient overlap."""
     if not recipes:
         return []
@@ -377,6 +377,11 @@ TARGET_INGREDIENTS = {
 }
 
 MAX_TOP_INGREDIENTS = 10
+MAX_RECOMMENDED_RECIPES = 10
+SPOONACULAR_CANDIDATE_RECIPES = 30
+INGREDIENT_COOLDOWN_RUNS = 5
+RECIPE_COOLDOWN_RUNS = 3
+INGREDIENT_SELECTION_POOL = MAX_TOP_INGREDIENTS * 8
 RESTRICTED_INGREDIENTS_CSV = os.path.join(
     os.path.dirname(__file__), "..", "data", "restricted_ingredients_clean.csv"
 )
@@ -600,6 +605,111 @@ def filter_recipes_by_restrictions(recipes, user_profile):
 
     return accepted, rejected
 
+
+def load_recent_recommendation_blocks(
+    user_id,
+    ingredient_cooldown_runs=INGREDIENT_COOLDOWN_RUNS,
+    recipe_cooldown_runs=RECIPE_COOLDOWN_RUNS,
+):
+    if not user_id:
+        return set(), set()
+
+    max_runs = max(ingredient_cooldown_runs, recipe_cooldown_runs)
+    if max_runs <= 0:
+        return set(), set()
+
+    conn = get_db()
+    try:
+        run_rows = conn.execute(
+            """
+            SELECT run_id, top_ingredients
+            FROM recommendation_runs
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (user_id, max_runs),
+        ).fetchall()
+
+        ingredient_blocks = set()
+        for row in run_rows[:ingredient_cooldown_runs]:
+            try:
+                ingredients = json.loads(row["top_ingredients"] or "[]")
+            except Exception:
+                ingredients = []
+            for ingredient in ingredients:
+                token = str(ingredient or "").strip().lower()
+                if token:
+                    ingredient_blocks.add(token)
+
+        recent_run_ids = [row["run_id"] for row in run_rows[:recipe_cooldown_runs] if row["run_id"]]
+        recipe_blocks = set()
+        if recent_run_ids:
+            placeholders = ",".join(["?"] * len(recent_run_ids))
+            recipe_rows = conn.execute(
+                f"""
+                SELECT DISTINCT recipe_id
+                FROM recommended_recipes
+                WHERE user_id = ?
+                  AND run_id IN ({placeholders})
+                """,
+                (user_id, *recent_run_ids),
+            ).fetchall()
+            recipe_blocks = {
+                str(row["recipe_id"])
+                for row in recipe_rows
+                if row["recipe_id"] is not None
+            }
+
+        return ingredient_blocks, recipe_blocks
+    finally:
+        conn.close()
+
+
+def apply_ingredient_cooldown(ranked_candidates, blocked_ingredients, limit=MAX_TOP_INGREDIENTS):
+    selected = []
+    blocked = []
+
+    for ingredient in ranked_candidates:
+        ingredient_name = str(ingredient.get("name") or "").strip()
+        if not ingredient_name:
+            continue
+
+        if ingredient_name.lower() in blocked_ingredients:
+            blocked.append(
+                {
+                    "name": ingredient_name,
+                    "reason": f"recently recommended ingredient cooldown ({INGREDIENT_COOLDOWN_RUNS} runs)",
+                }
+            )
+            continue
+
+        selected.append(ingredient)
+        if len(selected) >= limit:
+            break
+
+    return selected, blocked
+
+
+def filter_recently_shown_recipes(recipes, blocked_recipe_ids):
+    accepted = []
+    blocked = []
+
+    for recipe in recipes:
+        recipe_id = recipe.get("id")
+        recipe_id_str = str(recipe_id) if recipe_id is not None else ""
+        if recipe_id_str and recipe_id_str in blocked_recipe_ids:
+            blocked.append(
+                {
+                    "name": recipe.get("title", "Untitled Recipe"),
+                    "reason": f"recently shown recipe cooldown ({RECIPE_COOLDOWN_RUNS} runs)",
+                }
+            )
+            continue
+        accepted.append(recipe)
+
+    return accepted, blocked
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def normalize_profile_for_model(user_profile):
@@ -789,13 +899,21 @@ async def save_preferences(request: Request):
 async def rank_ingredients(request: Request):
     try:
         user_profile = await request.json()
+        user_id = (user_profile.get("user_id") or "").upper() or None
+        blocked_ingredients, _ = load_recent_recommendation_blocks(user_id)
         normalized_profile = normalize_profile_for_model(user_profile)
         ranked_pool = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS * 30)
-        ranked, filtered = filter_ranked_ingredients_by_restrictions(
+        ranked_candidates, filtered = filter_ranked_ingredients_by_restrictions(
             ranked_pool,
             user_profile,
+            limit=INGREDIENT_SELECTION_POOL,
+        )
+        ranked, cooldown_filtered = apply_ingredient_cooldown(
+            ranked_candidates,
+            blocked_ingredients,
             limit=MAX_TOP_INGREDIENTS,
         )
+        filtered.extend(cooldown_filtered)
 
         with open(AGGREGATE_CSV, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -829,6 +947,7 @@ async def recommend_recipes(request: Request):
     try:
         user_profile = await request.json()
         user_id = (user_profile.get("user_id") or "").upper() or None
+        blocked_ingredients, blocked_recipe_ids = load_recent_recommendation_blocks(user_id)
 
         api_key = os.getenv("SPOONACULAR_API_KEY")
         if not api_key:
@@ -841,18 +960,27 @@ async def recommend_recipes(request: Request):
             if recipe_id is not None
         }
         ranked_pool = model.recommend(normalized_profile, top_n=MAX_TOP_INGREDIENTS * 30)
-        top_ranked, filtered = filter_ranked_ingredients_by_restrictions(
+        ranked_candidates, filtered = filter_ranked_ingredients_by_restrictions(
             ranked_pool,
             user_profile,
+            limit=INGREDIENT_SELECTION_POOL,
+        )
+        top_ranked, cooldown_filtered = apply_ingredient_cooldown(
+            ranked_candidates,
+            blocked_ingredients,
             limit=MAX_TOP_INGREDIENTS,
         )
+        filtered.extend(cooldown_filtered)
         top_ingredient_names = [item.get('name') for item in top_ranked if item.get('name')]
 
         if not top_ingredient_names:
             return {"top_ingredients": [], "ranked": top_ranked, "filtered": filtered, "recipes": []}
 
         spoon = SpoonacularClient(api_key=api_key)
-        spoon_recipes = spoon.get_recipes_by_model_ingredients(top_ingredient_names, n=30)
+        spoon_recipes = spoon.get_recipes_by_model_ingredients(
+            top_ingredient_names,
+            n=SPOONACULAR_CANDIDATE_RECIPES,
+        )
 
         candidate_recipes = []
         for recipe in spoon_recipes:
@@ -904,10 +1032,14 @@ async def recommend_recipes(request: Request):
             candidate_recipes,
             user_profile,
         )
+        safe_recipes, cooldown_blocked_recipes = filter_recently_shown_recipes(
+            safe_recipes,
+            blocked_recipe_ids,
+        )
 
         recipes = diversify_recipes_by_ingredient_overlap(
             safe_recipes,
-            top_n=20,
+            top_n=MAX_RECOMMENDED_RECIPES,
             penalty_weight=0.35,
         )
 
@@ -920,6 +1052,7 @@ async def recommend_recipes(request: Request):
                 for item in filtered_recipe_rows
             ]
         )
+        filtered.extend(cooldown_blocked_recipes)
 
         recommendation_run_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
