@@ -472,7 +472,7 @@ const PreferencesScreen: React.FC<PreferencesScreenProps> = ({
           <TouchableOpacity
             style={[
               styles.saveButton,
-              { backgroundColor: "#2196F3", marginTop: 12 },
+              { backgroundColor: "#1976D2", marginTop: 12 },
             ]}
             onPress={() => savePreferences(true)}
             disabled={isSaving}
@@ -655,12 +655,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   saveButton: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#1976D2",
     paddingVertical: 16,
     borderRadius: 12,
     marginTop: 40,
     alignItems: "center",
-    shadowColor: "#2196F3",
+    shadowColor: "#1976D2",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
