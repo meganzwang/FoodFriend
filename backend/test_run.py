@@ -40,8 +40,8 @@ ingredient_names = [res['name'] for res in results]
 
 print(f"Feeding ingredients to Spoonacular: {', '.join(ingredient_names)}")
 
-# Fetch 20 recipes based on those 5 ingredients
-recipes = spoon.get_recipes_by_model_ingredients(ingredient_names, n=20)
+# Fetch 40 recipes based on those 5 ingredients
+recipes = spoon.get_recipes_by_model_ingredients(ingredient_names, n=40)
 
 print(f"\nFound {len(recipes)} recipes matching your AI model's suggestions:")
 for i, recipe in enumerate(recipes, 1):
