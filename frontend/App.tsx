@@ -14,7 +14,7 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import PreferencesScreen from "./src/screens/PreferencesScreen";
 import IngredientRankScreen from "./src/screens/IngredientRankScreen";
 import GroceryListScreen from "./src/screens/GroceryListScreen";
-import AllTriedRecipesScreen from "./src/screens/AllTriedRecipesScreen";
+import RecipeHistoryScreen from "./src/screens/RecipeHistoryScreen";
 import MyProgressScreen from "./src/screens/MyProgressScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { MainTabParamList, RootStackParamList } from "./types";
@@ -28,107 +28,105 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Main tab navigator for screens accessible after onboarding/login
 function MainAppTabs() {
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-      <Tab.Navigator
-        initialRouteName="ThisWeekRecipes"
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
-            if (route.name === "ThisWeekRecipes") {
-              iconName = focused ? "nutrition" : "nutrition-outline";
-            } else if (route.name === "ThisWeekGroceries") {
-              iconName = focused ? "basket" : "basket-outline";
-            } else if (route.name === "AllTriedRecipes") {
-              iconName = focused ? "library" : "library-outline";
-            } else if (route.name === "MyProgress") {
-              iconName = focused ? "home" : "home-outline";
-            } else if (route.name === "Profile") {
-              iconName = focused ? "person" : "person-outline";
-            } else {
-              iconName = "ellipse-outline";
-            }
-            return (
-              <Ionicons name={iconName as any} size={size} color={color} />
-            );
-          },
-          tabBarActiveTintColor: "tomato",
-          tabBarInactiveTintColor: "gray",
-          tabBarLabelStyle: {
-            fontSize: 11,
-            marginTop: 4,
-            marginBottom: 4,
-          },
-          headerShown: false,
-        })}
-      >
-        <Tab.Screen
-          name="ThisWeekRecipes"
-          component={RecipeFeedbackScreen}
-          options={{ title: "Recipes" }}
-        />
-        <Tab.Screen
-          name="ThisWeekGroceries"
-          component={GroceryListScreen}
-          options={{ title: "Grocery" }}
-        />
-        <Tab.Screen
-          name="AllTriedRecipes"
-          component={AllTriedRecipesScreen}
-          options={{ title: "Tried" }}
-        />
-        <Tab.Screen
-          name="MyProgress"
-          component={MyProgressScreen}
-          options={{ title: "Progress" }}
-        />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
-        <Tab.Screen
-          name="Goals"
-          component={GoalsScreen}
-          options={{
-            title: "Goals",
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: "none" },
-          }}
-        />
-        <Tab.Screen
-          name="Preferences"
-          component={PreferencesScreen}
-          options={{
-            title: "Preferences",
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: "none" },
-          }}
-        />
-        <Tab.Screen
-          name="IngredientRank"
-          component={IngredientRankScreen}
-          options={{
-            title: "IngredientRank",
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: "none" },
-          }}
-        />
-        <Tab.Screen
-          name="RecipePicker"
-          component={RecommendationsScreen}
-          options={{
-            title: "RecipePicker",
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: "none" },
-          }}
-        />
-        <Tab.Screen
-          name="RecipeFeedback"
-          component={RecipeFeedbackScreen}
-          options={{
-            title: "RecipeFeedback",
-            tabBarButton: () => null,
-            tabBarItemStyle: { display: "none" },
-          }}
-        />
-      </Tab.Navigator>
-    </SafeAreaView>
+    <Tab.Navigator
+      initialRouteName="ThisWeekRecipes"
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === "ThisWeekRecipes") {
+            iconName = focused ? "nutrition" : "nutrition-outline";
+          } else if (route.name === "ThisWeekGroceries") {
+            iconName = focused ? "basket" : "basket-outline";
+          } else if (route.name === "RecipeHistory") {
+            iconName = focused ? "library" : "library-outline";
+          } else if (route.name === "MyProgress") {
+            iconName = focused ? "home" : "home-outline";
+          } else if (route.name === "Profile") {
+            iconName = focused ? "person" : "person-outline";
+          } else {
+            iconName = "ellipse-outline";
+          }
+          return (
+            <Ionicons name={iconName as any} size={size} color={color} />
+          );
+        },
+        tabBarActiveTintColor: "tomato",
+        tabBarInactiveTintColor: "gray",
+        tabBarLabelStyle: {
+          fontSize: 11,
+          marginTop: 4,
+          marginBottom: 4,
+        },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen
+        name="ThisWeekRecipes"
+        component={RecipeFeedbackScreen}
+        options={{ title: "Recipes" }}
+      />
+      <Tab.Screen
+        name="ThisWeekGroceries"
+        component={GroceryListScreen}
+        options={{ title: "Grocery" }}
+      />
+      <Tab.Screen
+        name="RecipeHistory"
+        component={RecipeHistoryScreen}
+        options={{ title: "History" }}
+      />
+      <Tab.Screen
+        name="MyProgress"
+        component={MyProgressScreen}
+        options={{ title: "Progress" }}
+      />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen
+        name="Goals"
+        component={GoalsScreen}
+        options={{
+          title: "Goals",
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+      <Tab.Screen
+        name="Preferences"
+        component={PreferencesScreen}
+        options={{
+          title: "Preferences",
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+      <Tab.Screen
+        name="IngredientRank"
+        component={IngredientRankScreen}
+        options={{
+          title: "IngredientRank",
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+      <Tab.Screen
+        name="RecipePicker"
+        component={RecommendationsScreen}
+        options={{
+          title: "RecipePicker",
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+      <Tab.Screen
+        name="RecipeFeedback"
+        component={RecipeFeedbackScreen}
+        options={{
+          title: "RecipeFeedback",
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+    </Tab.Navigator>
   );
 }
 

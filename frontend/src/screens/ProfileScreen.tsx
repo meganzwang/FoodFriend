@@ -13,6 +13,7 @@ import { MainTabParamList, RootStackParamList } from "../../types";
 import { CompositeNavigationProp } from "@react-navigation/native";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type ProfileScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, "Profile">,
@@ -101,10 +102,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Your Profile</Text>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Your Profile</Text>
+      </View>
 
-      {/* User identity card */}
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* User identity card */}
       {userId && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>User ID</Text>
@@ -141,6 +145,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         />
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -156,16 +161,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   container: {
     flexGrow: 1,
     padding: 20,
     backgroundColor: "#f5f5f5",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#333",
+    flex: 1,
   },
   card: {
     backgroundColor: "#fff",

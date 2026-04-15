@@ -121,10 +121,10 @@ const MyProgressScreen: React.FC = () => {
     useState(false);
 
   const availableStatistics: Array<{ id: StatisticType; label: string }> = [
-    { id: "new_foods_tried", label: "New Foods Tried" },
+    { id: "new_foods_tried", label: "New Foods History" },
     { id: "recipes_liked", label: "Recipes Liked" },
     { id: "recipes_disliked", label: "Recipes Disliked" },
-    { id: "total_recipes", label: "Total Recipes Tried" },
+    { id: "total_recipes", label: "Recipe History" },
     { id: "repeat_recipes", label: "Recipes Re-added to Week" },
   ];
 
@@ -205,7 +205,7 @@ const MyProgressScreen: React.FC = () => {
       },
       {
         id: "total_recipes",
-        label: "Total Recipes Tried",
+        label: "Recipe History",
         value: total_count,
       },
       {
@@ -326,7 +326,7 @@ const MyProgressScreen: React.FC = () => {
     const ingredientsHtml = includeIngredientsInPdf
       ? `
         <section>
-          <h2>Ingredients Tried</h2>
+          <h2>Ingredients History</h2>
           <p><strong>Total unique ingredients:</strong> ${uniqueIngredients.length}</p>
           ${
             uniqueIngredients.length > 0
@@ -388,7 +388,7 @@ const MyProgressScreen: React.FC = () => {
         ? `
           <section>
             <h2>Recipe Summary</h2>
-            ${includeTotalRecipes ? `<p><strong>Total recipes tried:</strong> ${triedRecipes.length}</p>` : ""}
+            ${includeTotalRecipes ? `<p><strong>Total recipes in history:</strong> ${triedRecipes.length}</p>` : ""}
             ${includeRecipesLiked ? `<p><strong>Recipes liked:</strong> ${likedRecipes.length}</p><ul>${likedRecipes.map((r) => `<li>${escapeHtml(r.title)}</li>`).join("") || "<li>None</li>"}</ul>` : ""}
             ${includeRecipesDisliked ? `<p><strong>Recipes disliked:</strong> ${dislikedRecipes.length}</p><ul>${dislikedRecipes.map((r) => `<li>${escapeHtml(r.title)}</li>`).join("") || "<li>None</li>"}</ul>` : ""}
             ${includeRepeatRecipesInPdf ? `<p><strong>Recipes re-added:</strong> ${repeatRecipeTitles.length}</p><ul>${repeatRecipeTitles.map((title) => `<li>${escapeHtml(title)}</li>`).join("") || "<li>None</li>"}</ul>` : ""}
@@ -440,7 +440,7 @@ const MyProgressScreen: React.FC = () => {
     let preview = "FoodFriend Progress Report\n";
     preview += `Generated on ${new Date().toLocaleDateString()}\n`;
     if (includeIngredientsInPdf) {
-      preview += `New ingredients tried: ${uniqueIngredients.length}\n`;
+      preview += `New ingredients in history: ${uniqueIngredients.length}\n`;
       if (uniqueIngredients.length > 0) {
         preview +=
           uniqueIngredients.slice(0, 20).join(", ") +
@@ -469,7 +469,7 @@ const MyProgressScreen: React.FC = () => {
       );
       const total = triedRecipes.length;
       const readded = repeatRecipeTitles.length;
-      preview += `Recipes Tried: ${total} total, ${liked.length} liked, ${disliked.length} disliked, ${readded} re-added.\n`;
+      preview += `Recipe History: ${total} total, ${liked.length} liked, ${disliked.length} disliked, ${readded} re-added.\n`;
       if (liked.length > 0)
         preview += "  Liked: " + liked.map((r) => r.title).join(", ") + "\n";
       if (disliked.length > 0)
@@ -543,9 +543,12 @@ const MyProgressScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.headerRow}>
         <Text style={styles.title}>My Progress</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.subtitle}>Track your food journey</Text>
 
         <View style={styles.statsGrid}>
@@ -664,7 +667,7 @@ const MyProgressScreen: React.FC = () => {
                 <Text style={styles.checkmark}>✓</Text>
               )}
             </TouchableOpacity>
-            <Text style={styles.optionLabel}>Show all ingredients tried</Text>
+            <Text style={styles.optionLabel}>Show all ingredients in history</Text>
           </View>
 
           {/* Nutrient progress + ingredient selection */}
@@ -856,9 +859,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   container: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -870,12 +881,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#333",
-    marginBottom: 6,
+    flex: 1,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 18,
+    fontSize: 16,
+    color: "#1976D2",
+    fontWeight: "600",
+    marginBottom: 12,
   },
   statsGrid: {
     flexDirection: "row",

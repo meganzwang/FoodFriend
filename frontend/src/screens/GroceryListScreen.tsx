@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Recipe } from "../../types";
 import {
   getCurrentUserId,
@@ -70,11 +71,15 @@ const GroceryListScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>This Week's Groceries</Text>
-      <Text style={styles.subtitle}>
-        Ingredients from your selected recipes
-      </Text>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>This Week's Groceries</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.subtitle}>
+          Ingredients from your selected recipes
+        </Text>
 
       {selectedRecipes.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -138,15 +143,27 @@ const GroceryListScreen: React.FC = () => {
       >
         <Text style={styles.refreshButtonText}>Refresh grocery list</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: "#F5F5F5",
-    padding: 20,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -158,14 +175,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#333",
-    marginBottom: 6,
-    textAlign: "left",
+    flex: 1,
   },
   subtitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#1976D2",
-    marginBottom: 18,
+    marginBottom: 12,
   },
   body: {
     fontSize: 14,

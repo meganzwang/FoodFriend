@@ -204,15 +204,13 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
   };
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#f5f5f5" }}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backButtonText}>{"←"}</Text>
-          </TouchableOpacity>
-          <Text style={styles.titleHeader}>Your Weekly Recommendations</Text>
-        </View>
-      </SafeAreaView>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>{"←"}</Text>
+        </TouchableOpacity>
+        <Text style={styles.titleHeader}>Your Weekly Recommendations</Text>
+      </View>
 
       {isLoading ? (
         <ActivityIndicator
@@ -305,7 +303,7 @@ const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -313,8 +311,9 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
-    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   backButton: {
     marginRight: 10,
@@ -334,7 +333,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 15,
     backgroundColor: "#f5f5f5",
   },
   title: {
@@ -349,6 +347,8 @@ const styles = StyleSheet.create({
   },
   recommendationsList: {
     alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 20,
   },
   recipeCard: {

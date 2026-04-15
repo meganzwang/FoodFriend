@@ -39,8 +39,7 @@ const nutrientLabels: Record<string, { label: string }> = {
 };
 
 const formatNutrientChoice = (label: string, direction: NutrientDirection) => {
-  const directionLabel = direction === "more" ? "High" : "Low";
-  return `${directionLabel} ${label}`;
+  return direction === "more" ? `Not enough ${label}` : `Too much ${label}`;
 };
 
 const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
@@ -54,7 +53,7 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
     ingredients: false,
     flavors: false,
     textures: false,
-    nutrients: false,
+    nutrients: true,
   };
 
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
@@ -79,10 +78,7 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
 
   const recipeIngredients = useMemo(() => recipe?.ingredients || [], [recipe]);
 
-  const nutrientPrompt =
-    feedbackType === "liked"
-      ? "What did you like about nutrients?"
-      : "What did you dislike about nutrients?";
+  const nutrientPrompt = "Which nutrients would you like to see more or less of in your diet?";
 
   const recipeNutrients = useMemo(
     () =>
@@ -202,9 +198,6 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
             >
               <View style={styles.dropdownHeaderLeft}>
                 <Text style={styles.sectionTitle}>Ingredients</Text>
-                <Text style={styles.selectionSummary}>
-                  {formatSelectedSummary(selectedIngredients)}
-                </Text>
               </View>
               <Text style={styles.dropdownIndicator}>
                 {expandedSections.ingredients ? "Hide" : "Show"}
@@ -261,9 +254,6 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
             >
               <View style={styles.dropdownHeaderLeft}>
                 <Text style={styles.sectionTitle}>Flavors</Text>
-                <Text style={styles.selectionSummary}>
-                  {formatSelectedSummary(selectedFlavors)}
-                </Text>
               </View>
               <Text style={styles.dropdownIndicator}>
                 {expandedSections.flavors ? "Hide" : "Show"}
@@ -311,9 +301,6 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
             >
               <View style={styles.dropdownHeaderLeft}>
                 <Text style={styles.sectionTitle}>Textures</Text>
-                <Text style={styles.selectionSummary}>
-                  {formatSelectedSummary(selectedTextures)}
-                </Text>
               </View>
               <Text style={styles.dropdownIndicator}>
                 {expandedSections.textures ? "Hide" : "Show"}
@@ -361,12 +348,6 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
             >
               <View style={styles.dropdownHeaderLeft}>
                 <Text style={styles.sectionTitle}>Nutrients</Text>
-                <Text style={styles.selectionSummary}>
-                  {selectedNutrientsMore.length === 0 &&
-                  selectedNutrientsLess.length === 0
-                    ? "None selected"
-                    : `${selectedNutrientsMore.length} high + ${selectedNutrientsLess.length} low selected`}
-                </Text>
               </View>
               <Text style={styles.dropdownIndicator}>
                 {expandedSections.nutrients ? "Hide" : "Show"}
@@ -375,68 +356,87 @@ const RecipeFeedbackModal: React.FC<RecipeFeedbackModalProps> = ({
             {expandedSections.nutrients && (
               <View style={styles.nutrientSection}>
                 <Text style={styles.nutrientHelperText}>
-                  {nutrientPrompt} Example: High Protein, Low Calories.
+                  {nutrientPrompt}
                 </Text>
+
+                <Text style={styles.nutrientSubHeader}>Not enough:</Text>
                 <View style={styles.chipContainer}>
                   {recipeNutrients.map((nutrient) => {
-                    const highSelected = selectedNutrientsMore.includes(
+                    const isSelected = selectedNutrientsMore.includes(
                       nutrient.nutrient,
                     );
-                    const lowSelected = selectedNutrientsLess.includes(
+                    const isDisabled = selectedNutrientsLess.includes(
                       nutrient.nutrient,
                     );
 
                     return (
-                      <React.Fragment key={nutrient.nutrient}>
-                        <TouchableOpacity
-                          key={`high-${nutrient.nutrient}`}
+                      <TouchableOpacity
+                        key={`more-${nutrient.nutrient}`}
+                        style={[
+                          styles.chip,
+                          isSelected && {
+                            backgroundColor: "#4CAF50",
+                            borderColor: "#4CAF50",
+                          },
+                          isDisabled && { opacity: 0.3 },
+                        ]}
+                        onPress={() =>
+                          !isDisabled &&
+                          toggleNutrientSelection(nutrient.nutrient, "more")
+                        }
+                        disabled={isDisabled}
+                      >
+                        <Text
                           style={[
-                            styles.chip,
-                            styles.nutrientChip,
-                            highSelected && {
-                              backgroundColor: buttonColor,
-                              borderColor: buttonColor,
-                            },
+                            styles.chipText,
+                            isSelected && styles.chipTextSelected,
                           ]}
-                          onPress={() =>
-                            toggleNutrientSelection(nutrient.nutrient, "more")
-                          }
                         >
-                          <Text
-                            style={[
-                              styles.chipText,
-                              styles.nutrientChipText,
-                              highSelected && styles.chipTextSelected,
-                            ]}
-                          >
-                            {formatNutrientChoice(nutrient.label, "more")}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          key={`low-${nutrient.nutrient}`}
+                          {nutrient.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={[styles.nutrientSubHeader, { marginTop: 16 }]}>
+                  Include less:
+                </Text>
+                <View style={styles.chipContainer}>
+                  {recipeNutrients.map((nutrient) => {
+                    const isSelected = selectedNutrientsLess.includes(
+                      nutrient.nutrient,
+                    );
+                    const isDisabled = selectedNutrientsMore.includes(
+                      nutrient.nutrient,
+                    );
+
+                    return (
+                      <TouchableOpacity
+                        key={`less-${nutrient.nutrient}`}
+                        style={[
+                          styles.chip,
+                          isSelected && {
+                            backgroundColor: "#D32F2F",
+                            borderColor: "#D32F2F",
+                          },
+                          isDisabled && { opacity: 0.3 },
+                        ]}
+                        onPress={() =>
+                          !isDisabled &&
+                          toggleNutrientSelection(nutrient.nutrient, "less")
+                        }
+                        disabled={isDisabled}
+                      >
+                        <Text
                           style={[
-                            styles.chip,
-                            styles.nutrientChip,
-                            lowSelected && {
-                              backgroundColor: buttonColor,
-                              borderColor: buttonColor,
-                            },
+                            styles.chipText,
+                            isSelected && styles.chipTextSelected,
                           ]}
-                          onPress={() =>
-                            toggleNutrientSelection(nutrient.nutrient, "less")
-                          }
                         >
-                          <Text
-                            style={[
-                              styles.chipText,
-                              styles.nutrientChipText,
-                              lowSelected && styles.chipTextSelected,
-                            ]}
-                          >
-                            {formatNutrientChoice(nutrient.label, "less")}
-                          </Text>
-                        </TouchableOpacity>
-                      </React.Fragment>
+                          {nutrient.label}
+                        </Text>
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
@@ -504,6 +504,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  nutrientSubHeader: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#444",
+    marginTop: 8,
   },
   dropdownHeader: {
     flexDirection: "row",

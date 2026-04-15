@@ -205,7 +205,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView
       style={styles.container}
-      edges={["top", "bottom", "left", "right"]}
+      edges={["top", "left", "right"]}
     >
       <View style={styles.headerRow}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -261,8 +261,9 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
-    // marginTop: 8, // Removed to prevent header cut-off by notch; SafeAreaView handles spacing
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   backButton: {
     marginRight: 10,
@@ -290,7 +291,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   title: {
@@ -302,12 +304,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
-    marginBottom: 24,
+    color: "#1976D2",
+    fontWeight: "600",
+    marginBottom: 12,
     textAlign: "center",
   },
   sectionHeader: {
-    marginTop: 20,
+    marginTop: 12,
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",

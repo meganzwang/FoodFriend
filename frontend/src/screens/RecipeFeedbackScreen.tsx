@@ -406,136 +406,136 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <SafeAreaView edges={["top"]} style={{ backgroundColor: "#F5F5F5" }}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Text style={styles.backButtonText}>{"←"}</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Your Weekly Recipes</Text>
-        </View>
-      </SafeAreaView>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F5F5F5" }} edges={["top"]}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>{"←"}</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Your Weekly Recipes</Text>
+      </View>
 
-      <Text style={styles.progressText}>
-        Reviewed {completedCount} of {selectedRecipes.length}
-      </Text>
-
-      <ScrollView contentContainerStyle={styles.list}>
-        {selectedRecipes.map((recipe) => {
-          const feedback = recipe?.id ? feedbackByRecipe[recipe.id] : undefined;
-          return (
-            <View key={`${recipe.id}-${recipe.title}`} style={styles.card}>
-              <View style={styles.cardHeader}>
-                {recipe.image ? (
-                  <Image
-                    source={{ uri: recipe.image }}
-                    style={styles.recipeImage}
-                  />
-                ) : (
-                  <View style={styles.recipeImagePlaceholder}>
-                    <Text style={styles.placeholderText}>No image</Text>
-                  </View>
-                )}
-                <View style={styles.cardHeaderContent}>
-                  <View style={styles.titleRow}>
-                    <TouchableOpacity
-                      style={styles.titleTouchable}
-                      onPress={() => {
-                        if (recipe.sourceUrl) {
-                          Linking.openURL(recipe.sourceUrl).catch(() =>
-                            Alert.alert("Error", "Could not open recipe link"),
-                          );
-                        }
-                      }}
-                    >
-                      <Text
-                        style={[styles.recipeTitle, styles.recipeTitleLink]}
-                      >
-                        {recipe.title}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeRecipe(recipe)}
-                    >
-                      <Text style={styles.removeButtonText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.recipeMeta}>
-                    {recipe.readyInMinutes
-                      ? `${recipe.readyInMinutes} min`
-                      : "Time N/A"}
-                    {recipe.calories
-                      ? ` • ${Math.round(recipe.calories)} kcal`
-                      : ""}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.thumbButton,
-                    feedback?.type === "liked" && styles.thumbButtonLiked,
-                  ]}
-                  onPress={() => setRecipeReaction(recipe, "liked")}
-                >
-                  <Text style={styles.thumbEmoji}>👍</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.thumbButton,
-                    feedback?.type === "disliked" && styles.thumbButtonDisliked,
-                  ]}
-                  onPress={() => setRecipeReaction(recipe, "disliked")}
-                >
-                  <Text style={styles.thumbEmoji}>👎</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.tellUsMoreButton,
-                    !feedback?.type && styles.tellUsMoreButtonDisabled,
-                  ]}
-                  onPress={() =>
-                    feedback?.type ? openTellUsMore(recipe) : null
-                  }
-                  disabled={!feedback?.type}
-                >
-                  <Text
-                    style={[
-                      styles.tellUsMoreText,
-                      !feedback?.type && styles.tellUsMoreTextDisabled,
-                    ]}
-                  >
-                    Tell us more
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {feedback && (
-                <Text style={styles.statusText}>
-                  Saved as {feedback.type} ({feedback.ingredients.length}{" "}
-                  ingredient, {feedback.flavors.length} flavor,{" "}
-                  {feedback.textures.length} texture,{" "}
-                  {feedback.nutrientsMore.length +
-                    feedback.nutrientsLess.length}{" "}
-                  nutrient tags)
-                </Text>
-              )}
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      <TouchableOpacity
-        style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
-        onPress={saveFeedback}
-        disabled={isSaving}
-      >
-        <Text style={styles.submitButtonText}>
-          {isSaving ? "Saving..." : "Save & Continue"}
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.progressText}>
+          Reviewed {completedCount} of {selectedRecipes.length}
         </Text>
-      </TouchableOpacity>
+
+        <View style={styles.list}>
+          {selectedRecipes.map((recipe) => {
+            const feedback = recipe?.id ? feedbackByRecipe[recipe.id] : undefined;
+            return (
+              <View key={`${recipe.id}-${recipe.title}`} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  {recipe.image ? (
+                    <Image
+                      source={{ uri: recipe.image }}
+                      style={styles.recipeImage}
+                    />
+                  ) : (
+                    <View style={styles.recipeImagePlaceholder}>
+                      <Text style={styles.placeholderText}>No image</Text>
+                    </View>
+                  )}
+                  <View style={styles.cardHeaderContent}>
+                    <View style={styles.titleRow}>
+                      <TouchableOpacity
+                        style={styles.titleTouchable}
+                        onPress={() => {
+                          if (recipe.sourceUrl) {
+                            Linking.openURL(recipe.sourceUrl).catch(() =>
+                              Alert.alert("Error", "Could not open recipe link"),
+                            );
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[styles.recipeTitle, styles.recipeTitleLink]}
+                        >
+                          {recipe.title}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => removeRecipe(recipe)}
+                      >
+                        <Text style={styles.removeButtonText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.recipeMeta}>
+                      {recipe.readyInMinutes
+                        ? `${recipe.readyInMinutes} min`
+                        : "Time N/A"}
+                      {recipe.calories
+                        ? ` • ${Math.round(recipe.calories)} kcal`
+                        : ""}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.thumbButton,
+                      feedback?.type === "liked" && styles.thumbButtonLiked,
+                    ]}
+                    onPress={() => setRecipeReaction(recipe, "liked")}
+                  >
+                    <Text style={styles.thumbEmoji}>👍</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.thumbButton,
+                      feedback?.type === "disliked" && styles.thumbButtonDisliked,
+                    ]}
+                    onPress={() => setRecipeReaction(recipe, "disliked")}
+                  >
+                    <Text style={styles.thumbEmoji}>👎</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.tellUsMoreButton,
+                      !feedback?.type && styles.tellUsMoreButtonDisabled,
+                    ]}
+                    onPress={() =>
+                      feedback?.type ? openTellUsMore(recipe) : null
+                    }
+                    disabled={!feedback?.type}
+                  >
+                    <Text
+                      style={[
+                        styles.tellUsMoreText,
+                        !feedback?.type && styles.tellUsMoreTextDisabled,
+                      ]}
+                    >
+                      Tell us more
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {feedback && (
+                  <Text style={styles.statusText}>
+                    Saved as {feedback.type} ({feedback.ingredients.length}{" "}
+                    ingredient, {feedback.flavors.length} flavor,{" "}
+                    {feedback.textures.length} texture,{" "}
+                    {feedback.nutrientsMore.length +
+                      feedback.nutrientsLess.length}{" "}
+                    nutrient tags)
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.submitButton, isSaving && styles.submitButtonDisabled]}
+          onPress={saveFeedback}
+          disabled={isSaving}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSaving ? "Saving..." : "Save & Continue"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <RecipeFeedbackModal
         visible={!!activeRecipe}
@@ -544,7 +544,7 @@ const RecipeFeedbackScreen: React.FC<RecipeFeedbackScreenProps> = ({
         onClose={() => setActiveRecipe(null)}
         onSubmit={handleModalSubmit}
       />
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -552,13 +552,16 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     backgroundColor: "#F5F5F5",
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
-    // marginTop intentionally omitted for alignment with other screens
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   backButton: {
     marginRight: 10,
@@ -580,6 +583,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#1976D2",
     fontWeight: "600",
+    fontSize: 16,
     marginBottom: 12,
   },
   list: {

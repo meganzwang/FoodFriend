@@ -130,9 +130,12 @@ const IngredientRankScreen: React.FC<IngredientRankScreenProps> = ({
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom", "left", "right"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Personalized Rankings</Text>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Your Personalized Rankings</Text>
         <Text style={styles.subtitle}>
           Based on your goals and preferences, here is how we rank our test
           ingredients:
@@ -224,19 +227,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 40,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "700",
     color: "#333",
-    marginBottom: 8,
+    flex: 1,
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
-    marginBottom: 24,
+    color: "#1976D2",
+    fontWeight: "600",
+    marginBottom: 12,
   },
   sectionHeader: {
     marginBottom: 12,

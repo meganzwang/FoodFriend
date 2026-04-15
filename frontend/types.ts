@@ -17,7 +17,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   ThisWeekRecipes: { selectedRecipes?: Recipe[] } | undefined;
   ThisWeekGroceries: undefined;
-  AllTriedRecipes: undefined;
+  RecipeHistory: undefined;
   MyProgress: undefined;
   Profile: undefined;
   Goals: undefined;
